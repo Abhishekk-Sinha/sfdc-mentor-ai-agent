@@ -50,14 +50,12 @@ export function Dashboard() {
   const completedTasks = tasks.filter(t => t.done).length;
   const totalTasks = tasks.length;
   const routeDoneToday = Object.keys(mentorDone).filter(k => k.startsWith(`${activeDay}-`) && mentorDone[k]).length;
-  const quote = 'Dream is not that which you see while sleeping; it is something that does not let you sleep. — Dr. A. P. J. Abdul Kalam';
   const launchers = ['AI Mentor Agent','Mentor Route','Focus Mode','Learning Coach','100 Days English','Practice Lab','Scenario Questions','Use Cases','Weekly Tests','Interview Q&A','Job Tracker','More Tools'];
   const routes = ['/ai-mentor','/mentor-route','/focus','/learning-coach','/english','/practice','/scenarios','/use-cases','/weekly-tests','/interview','/job-tracker','/more-tools'];
   return <Layout><Page>
-    <Hero title="Dashboard Command Center" subtitle="Job Ready % ab real saved work se calculate hota hai: tasks complete, answers save, strong marks, weekly tests aur job pipeline.">
+    <Hero title="Dashboard Command Center" subtitle="Job Ready % real saved work se calculate hota hai: tasks complete, answers save, strong marks, weekly tests aur job pipeline.">
       <div className="scoreCircle"><b>{score}%</b><span>Job Ready</span></div>
     </Hero>
-    <Card title="Motivation" subtitle="APJ Abdul Kalam reminder"><p className="motivation">{quote}</p><p className="hint">Aaj ka target: ek saved answer, ek strong topic, ek focused work block, aur ek job action. Har action se score increase hoga.</p></Card>
     <div className="statsGrid">
       <Stat icon="🎯" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce} • DSA: ${today.dsa}`}/>
       <Stat icon="✅" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
