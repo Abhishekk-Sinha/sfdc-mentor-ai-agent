@@ -6,7 +6,7 @@ import urllib.parse
 import json
 import urllib.request
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="1.0.0")
+app = FastAPI(title="SFDC Mentor Complete Backend", version="1.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 class MentorRequest(BaseModel):
@@ -25,25 +25,40 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "mentor-backend", "mode": "local + ollama + search-links"}
+    return {"ok": True, "service": "mentor-backend", "mode": "local + ollama + search-links", "version": "1.1.0"}
+
+@app.get("/api/ollama-status")
+def ollama_status():
+    try:
+        request = urllib.request.Request("http://127.0.0.1:11434/api/tags")
+        with urllib.request.urlopen(request, timeout=3) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        return {"ok": True, "models": data.get("models", [])}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 @app.post("/api/mentor")
 def mentor(req: MentorRequest):
     q = req.question.strip()
     if not q:
         return {"answer": "Please ask a question first.", "links": []}
+    context = req.context or {}
+    mode = context.get("mode", "General Mentor")
+    difficulty = context.get("difficulty", "2+ Years")
+    interview_mode = context.get("interviewMode", "Technical Round")
     if req.mode == "ollama":
         try:
-            payload = json.dumps({"model": "llama3.2", "prompt": q, "stream": False}).encode("utf-8")
+            prompt = f"""You are Abhishek's Salesforce career mentor. Answer in practical Hinglish/English mix when useful.\nMode: {mode}\nDifficulty: {difficulty}\nInterview mode: {interview_mode}\nQuestion: {q}\nGive structured answer with: concept, real scenario, steps, interview answer, follow-up questions, and next action."""
+            payload = json.dumps({"model": "llama3.2", "prompt": prompt, "stream": False}).encode("utf-8")
             request = urllib.request.Request("http://127.0.0.1:11434/api/generate", data=payload, headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(request, timeout=20) as response:
+            with urllib.request.urlopen(request, timeout=30) as response:
                 data = json.loads(response.read().decode("utf-8"))
             return {"answer": data.get("response", "Ollama returned no response."), "source": "ollama", "links": []}
         except Exception as exc:
             return {"answer": f"Ollama offline or unavailable: {exc}. Use search links below.", "source": "fallback", "links": search_links(q)}
     return {
-        "answer": "Mentor answer format: definition → practical example → real scenario → interview answer → revision action. Save your answer and mark Weak/Strong.",
-        "source": "local",
+        "answer": backend_mentor_answer(q, mode, difficulty, interview_mode),
+        "source": "fastapi-mentor",
         "links": search_links(q),
     }
 
@@ -69,6 +84,30 @@ def review_answer(req: ReviewRequest):
 def api_search_links(q: str):
     return {"query": q, "links": search_links(q)}
 
+@app.get("/api/dashboard-summary")
+def dashboard_summary():
+    return {
+        "status": "ready",
+        "next_actions": [
+            "Complete one 45-minute Salesforce sprint",
+            "Save one interview answer",
+            "Mark one topic Strong or Weak",
+            "Apply/follow up on one job"
+        ]
+    }
+
+def backend_mentor_answer(q: str, mode: str, difficulty: str, interview_mode: str) -> str:
+    return (
+        f"Backend mentor answer for: {q}\n\n"
+        f"Mode: {mode}\nDifficulty: {difficulty}\nInterview Round: {interview_mode}\n\n"
+        "1. Concept: define it in simple words.\n"
+        "2. Real scenario: connect it to CRM/business use case.\n"
+        "3. Implementation: mention configuration/code/data/security/testing.\n"
+        "4. Interview answer: keep it clear, structured, and impact-focused.\n"
+        "5. Follow-up: prepare edge cases, limitations, and alternatives.\n"
+        "6. Next action: save this answer, mark Weak/Strong, and revise it in weekly test."
+    )
+
 def search_links(q: str):
     e = urllib.parse.quote(q)
     return [
@@ -78,4 +117,5 @@ def search_links(q: str):
         {"title": "Trailhead Search", "url": f"https://trailhead.salesforce.com/search?keywords={e}"},
         {"title": "StackExchange Salesforce", "url": f"https://salesforce.stackexchange.com/search?q={e}"},
         {"title": "LeetCode Search", "url": f"https://leetcode.com/problemset/?search={e}"},
+        {"title": "HackerRank Search", "url": f"https://www.hackerrank.com/search?term={e}"},
     ]
