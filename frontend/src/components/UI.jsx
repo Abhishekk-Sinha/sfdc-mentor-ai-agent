@@ -29,7 +29,7 @@ export const navGroups = [
   { title: 'Core', items: [['Dashboard','/dashboard','🏠'], ['AI Mentor Agent','/ai-mentor','🤖'], ['Mentor Route','/mentor-route','🎯'], ['Focus Mode','/focus','✨'], ['Learning Coach','/learning-coach','📘']] },
   { title: 'Learning', items: [['100 Days English','/english','🗣️'], ['Practice Lab','/practice','💻'], ['Scenario Questions','/scenarios','🧩'], ['Use Cases','/use-cases','🏗️'], ['Weekly Tests','/weekly-tests','🧪']] },
   { title: 'Practice & Career', items: [['Interview Q&A','/interview','🎤'], ['Projects','/projects','🚀'], ['Job Tracker','/job-tracker','💼'], ['JD Matcher','/jd-matcher','🧾'], ['Resume Optimizer','/resume','📄']] },
-  { title: 'Vault & Tools', items: [['24h Tracker','/time-tracker','⏱️'], ['Notes Library','/notes','📝'], ['Documents','/documents','🗂️'], ['Doubt Tracker','/doubts','❓'], ['More Tools','/more-tools','🧰'], ['Backup','/backup','💾']] },
+  { title: 'Vault & Tools', items: [['24h Tracker','/time-tracker','⏱️'], ['Notes Library','/notes','📝'], ['Documents','/documents','🗂️'], ['Doubt Tracker','/doubts','❓'], ['Portfolio Manager','/portfolio-manager','🖼️'], ['More Tools','/more-tools','🧰'], ['Backup','/backup','💾']] },
 ];
 
 const allTools = navGroups.flatMap(g => g.items.map(([label, to, icon]) => ({ label, to, icon, group: g.title })));
@@ -38,6 +38,7 @@ const quickCommands = [
   { label: 'Find Weak Topics', to: '/practice', icon: '⚠️' },
   { label: 'Take Weekly Test', to: '/weekly-tests', icon: '🧪' },
   { label: 'Add Job Follow-up', to: '/job-tracker', icon: '💼' },
+  { label: 'Update Portfolio Photo', to: '/portfolio-manager', icon: '🖼️' },
   { label: 'Ask AI Mentor', to: '/ai-mentor', icon: '🤖' },
 ];
 
@@ -66,7 +67,7 @@ function CommandBar() {
 function FloatingActions() {
   const [open, setOpen] = React.useState(false);
   const actions = [
-    ['Save Note','/notes','📝'], ['Add Doubt','/doubts','❓'], ['Start Sprint','/time-tracker','⏱️'], ['Ask Mentor','/ai-mentor','🤖'], ['Add Job','/job-tracker','💼']
+    ['Save Note','/notes','📝'], ['Add Doubt','/doubts','❓'], ['Start Sprint','/time-tracker','⏱️'], ['Ask Mentor','/ai-mentor','🤖'], ['Update Photo','/portfolio-manager','🖼️'], ['Add Job','/job-tracker','💼']
   ];
   return <div className="fabWrap">
     {open && <div className="fabMenu">{actions.map(([label,to,icon]) => <Link key={to} to={to} onClick={() => setOpen(false)}><span>{icon}</span>{label}</Link>)}</div>}
