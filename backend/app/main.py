@@ -5,17 +5,33 @@ from typing import Optional, Dict, Any, List
 import urllib.parse
 import json
 import urllib.request
+import sqlite3
+import time
+from pathlib import Path
 
-try:
-    from .pro_persistence import register_persistence_routes, SearchRequest
-except Exception:
-    register_persistence_routes = None
-    SearchRequest = None
-
-app = FastAPI(title="SFDC Mentor Complete Backend", version="2.1.0")
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.2.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-if register_persistence_routes:
-    register_persistence_routes(app)
+
+DB_PATH = Path(__file__).resolve().parent.parent / "mentor_storage.sqlite3"
+
+def db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_key TEXT,
+            item_type TEXT,
+            title TEXT,
+            payload TEXT NOT NULL,
+            created_at REAL,
+            updated_at REAL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_key ON items(item_key)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_type ON items(item_type)")
+    conn.commit()
+    return conn
 
 class MentorRequest(BaseModel):
     question: str
@@ -27,13 +43,93 @@ class ReviewRequest(BaseModel):
     question: str
     answer: str
 
+class SearchRequest(BaseModel):
+    query: str = ""
+    limit: int = 20
+
 @app.get("/")
 def root():
     return {"status": "running", "app": "SFDC Mentor Complete Backend", "docs": "/docs"}
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "mentor-backend", "mode": "local + sqlite + ollama + search-links", "version": "2.1.0"}
+    return {"ok": True, "service": "mentor-backend", "mode": "local + sqlite + ollama + search-links", "version": "2.2.0"}
+
+@app.post("/api/items")
+def save_item(item: Dict[str, Any]):
+    """Generic persistence endpoint used by frontend auto-sync.
+    Accepts any JSON shape and stores it safely in SQLite.
+    """
+    now = time.time()
+    item_key = str(item.get("key") or item.get("storageKey") or item.get("id") or item.get("name") or f"item-{int(now*1000)}")
+    item_type = str(item.get("type") or item.get("category") or item.get("module") or "general")
+    title = str(item.get("title") or item.get("label") or item.get("name") or item_key)[:250]
+    payload = json.dumps(item, ensure_ascii=False)
+    conn = db()
+    existing = conn.execute("SELECT id FROM items WHERE item_key=?", (item_key,)).fetchone()
+    if existing:
+        conn.execute("UPDATE items SET item_type=?, title=?, payload=?, updated_at=? WHERE item_key=?", (item_type, title, payload, now, item_key))
+        row_id = existing["id"]
+    else:
+        cur = conn.execute("INSERT INTO items(item_key,item_type,title,payload,created_at,updated_at) VALUES(?,?,?,?,?,?)", (item_key, item_type, title, payload, now, now))
+        row_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return {"ok": True, "id": row_id, "key": item_key, "type": item_type}
+
+@app.get("/api/items")
+def list_items(key: Optional[str] = None, type: Optional[str] = None, limit: int = 100):
+    conn = db()
+    sql = "SELECT * FROM items WHERE 1=1"
+    params: List[Any] = []
+    if key:
+        sql += " AND item_key=?"
+        params.append(key)
+    if type:
+        sql += " AND item_type=?"
+        params.append(type)
+    sql += " ORDER BY updated_at DESC LIMIT ?"
+    params.append(max(1, min(limit, 500)))
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        try:
+            payload = json.loads(r["payload"])
+        except Exception:
+            payload = r["payload"]
+        out.append({"id": r["id"], "key": r["item_key"], "type": r["item_type"], "title": r["title"], "payload": payload, "updated_at": r["updated_at"]})
+    return {"ok": True, "items": out}
+
+@app.post("/api/search")
+def search_items(req: SearchRequest):
+    q = (req.query or "").lower().strip()
+    conn = db()
+    rows = conn.execute("SELECT * FROM items ORDER BY updated_at DESC LIMIT 1000").fetchall()
+    conn.close()
+    results = []
+    for r in rows:
+        text = f"{r['item_key']} {r['item_type']} {r['title']} {r['payload']}".lower()
+        if not q or q in text:
+            snippet = r["payload"][:500]
+            results.append({"id": r["id"], "key": r["item_key"], "type": r["item_type"], "title": r["title"], "snippet": snippet})
+        if len(results) >= max(1, min(req.limit, 50)):
+            break
+    return {"ok": True, "query": req.query, "results": results}
+
+@app.get("/api/search")
+def search_items_get(q: str = "", limit: int = 20):
+    return search_items(SearchRequest(query=q, limit=limit))
+
+@app.get("/api/analytics")
+def analytics():
+    conn = db()
+    total = conn.execute("SELECT COUNT(*) AS c FROM items").fetchone()["c"]
+    rows = conn.execute("SELECT item_type, COUNT(*) AS c FROM items GROUP BY item_type").fetchall()
+    conn.close()
+    by_type = {r["item_type"]: r["c"] for r in rows}
+    score = min(100, 20 + total * 2 + by_type.get("answer", 0) * 3 + by_type.get("job", 0) * 2)
+    return {"ok": True, "items": total, "by_type": by_type, "job_ready_score": score}
 
 @app.get("/api/ollama-status")
 def ollama_status():
@@ -55,18 +151,15 @@ def mentor(req: MentorRequest):
     difficulty = context.get("difficulty", "2+ Years")
     interview_mode = context.get("interviewMode", "Technical Round")
     saved_context = ""
-    if SearchRequest and req.mode in ["backend", "rag", "ollama"]:
+    if req.mode in ["backend", "rag", "ollama"]:
         try:
-            for route in app.routes:
-                if getattr(route, "path", "") == "/api/search":
-                    result = route.endpoint(SearchRequest(query=q, limit=6))
-                    saved_context = "\n".join([f"[{r.get('key')}] {r.get('snippet')}" for r in result.get("results", [])])
-                    break
+            result = search_items(SearchRequest(query=q, limit=6))
+            saved_context = "\n".join([f"[{r.get('key')}] {r.get('snippet')}" for r in result.get("results", [])])
         except Exception:
             saved_context = ""
     if req.mode == "ollama":
         try:
-            prompt = f"""You are Abhishek's 20+ years Salesforce Solution Architect mentor. Use saved app context first, then answer practically in simple English + Hinglish where helpful.
+            prompt = f"""You are Abhishek's 20+ years Salesforce Solution Architect mentor. Use saved app context first, then answer practically in simple English.
 Mode: {mode}
 Difficulty: {difficulty}
 Interview mode: {interview_mode}
@@ -81,12 +174,7 @@ Give: beginner explanation, deep architect view, project use case, interview ans
             return {"answer": data.get("response", "Ollama returned no response."), "source": "ollama-rag", "context": saved_context, "links": []}
         except Exception as exc:
             return {"answer": f"Ollama offline or unavailable: {exc}. Use saved context and search links below.\n\n{backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context)}", "source": "fallback", "context": saved_context, "links": search_links(q)}
-    return {
-        "answer": backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context),
-        "source": "fastapi-sqlite-mentor" if saved_context else "fastapi-mentor",
-        "context": saved_context,
-        "links": search_links(q),
-    }
+    return {"answer": backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context), "source": "fastapi-sqlite-mentor" if saved_context else "fastapi-mentor", "context": saved_context, "links": search_links(q)}
 
 @app.post("/api/review-answer")
 def review_answer(req: ReviewRequest):
@@ -112,39 +200,12 @@ def api_search_links(q: str):
 
 @app.get("/api/dashboard-summary")
 def dashboard_summary():
-    analytics = {"job_ready_score": 0, "items": 0}
-    try:
-        for route in app.routes:
-            if getattr(route, "path", "") == "/api/analytics":
-                analytics = route.endpoint()
-                break
-    except Exception:
-        pass
-    return {
-        "status": "ready",
-        "job_ready_score": analytics.get("job_ready_score", 0),
-        "items": analytics.get("items", 0),
-        "next_actions": [
-            "Complete one 45-minute Salesforce sprint",
-            "Save one interview answer",
-            "Mark one topic Strong or Weak",
-            "Apply/follow up on one job"
-        ]
-    }
+    data = analytics()
+    return {"status": "ready", "job_ready_score": data.get("job_ready_score", 0), "items": data.get("items", 0), "next_actions": ["Complete one 45-minute Salesforce sprint", "Save one interview answer", "Mark one topic Strong or Weak", "Apply/follow up on one job"]}
 
 def backend_mentor_answer(q: str, mode: str, difficulty: str, interview_mode: str, saved_context: str = "") -> str:
     context_line = f"\nSaved app context found:\n{saved_context}\n" if saved_context else "\nNo saved context found yet. Save notes/answers/jobs first for RAG guidance.\n"
-    return (
-        f"Backend mentor answer for: {q}\n\n"
-        f"Mode: {mode}\nDifficulty: {difficulty}\nInterview Round: {interview_mode}\n"
-        f"{context_line}\n"
-        "1. Concept: define it in simple words.\n"
-        "2. Beginner view: explain like you are starting from zero.\n"
-        "3. Real scenario: connect it to CRM/business use case.\n"
-        "4. Architect view: data model, security, limits, trade-offs, integration and deployment.\n"
-        "5. Interview answer: use STAR + technical depth + measurable impact.\n"
-        "6. Next action: save answer, create project proof, mark Weak/Strong, revise in weekly test."
-    )
+    return (f"Backend mentor answer for: {q}\n\nMode: {mode}\nDifficulty: {difficulty}\nInterview Round: {interview_mode}\n{context_line}\n1. Concept: define it in simple words.\n2. Beginner view: explain like you are starting from zero.\n3. Real scenario: connect it to CRM/business use case.\n4. Architect view: data model, security, limits, trade-offs, integration and deployment.\n5. Interview answer: use STAR + technical depth + measurable impact.\n6. Next action: save answer, create project proof, mark Weak/Strong, revise in weekly test.")
 
 def search_links(q: str):
     e = urllib.parse.quote(q)
