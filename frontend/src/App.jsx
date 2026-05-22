@@ -10,14 +10,16 @@ import { InterviewQA, ProjectsPage, WeeklyTests } from './pages/TestsInterview';
 import { JDMatcher, JobTracker, MoreTools } from './pages/JobsTools';
 import { Backup, Documents, Doubts, Journal, Notes, TimeTracker } from './pages/Productivity';
 import { Certifications, ResumeOptimizer } from './pages/ResumeCert';
-import { PremiumFeatures } from './pages/PremiumFeatures';
 import { FinalPremium } from './pages/FinalPremium';
-import { ZeroToHeroArchitect } from './pages/ZeroToHeroArchitect';
 
 function Protected({ children }) {
   const session = readStore('session', null);
   if (!session) return <Navigate to="/login" replace />;
   return children;
+}
+
+function DashboardRedirect() {
+  return <Protected><Navigate to="/dashboard" replace /></Protected>;
 }
 
 export default function App() {
@@ -30,7 +32,7 @@ export default function App() {
     <Route path="/mentor-route" element={<Protected><MentorRoute/></Protected>}/>
     <Route path="/focus" element={<Protected><FocusMode/></Protected>}/>
     <Route path="/learning-coach" element={<Protected><LearningCoach/></Protected>}/>
-    <Route path="/zero-to-hero" element={<Protected><ZeroToHeroArchitect/></Protected>}/>
+    <Route path="/zero-to-hero" element={<DashboardRedirect/>}/>
     <Route path="/english" element={<Protected><English100/></Protected>}/>
     <Route path="/practice" element={<Protected><PracticeLab/></Protected>}/>
     <Route path="/scenarios" element={<Protected><ScenarioQuestions/></Protected>}/>
@@ -48,7 +50,7 @@ export default function App() {
     <Route path="/journal" element={<Protected><Journal/></Protected>}/>
     <Route path="/certifications" element={<Protected><Certifications/></Protected>}/>
     <Route path="/portfolio-manager" element={<Protected><PortfolioManager/></Protected>}/>
-    <Route path="/premium-features" element={<Protected><PremiumFeatures/></Protected>}/>
+    <Route path="/premium-features" element={<DashboardRedirect/>}/>
     <Route path="/final-premium" element={<Protected><FinalPremium/></Protected>}/>
     <Route path="/more-tools" element={<Protected><MoreTools/></Protected>}/>
     <Route path="/backup" element={<Protected><Backup/></Protected>}/>
