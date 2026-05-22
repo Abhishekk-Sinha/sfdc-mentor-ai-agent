@@ -50,14 +50,30 @@ export function Dashboard() {
   const completedTasks = tasks.filter(t => t.done).length;
   const totalTasks = tasks.length;
   const routeDoneToday = Object.keys(mentorDone).filter(k => k.startsWith(`${activeDay}-`) && mentorDone[k]).length;
-  const launchers = ['AI Mentor Agent','Mentor Route','Focus Mode','Learning Coach','100 Days English','Practice Lab','Scenario Questions','Use Cases','Weekly Tests','Interview Q&A','Job Tracker','More Tools'];
-  const routes = ['/ai-mentor','/mentor-route','/focus','/learning-coach','/english','/practice','/scenarios','/use-cases','/weekly-tests','/interview','/job-tracker','/more-tools'];
+  const workflow = [
+    { title: '1. Learning Plan', path: '/zero-to-hero', icon: '🎯', text: 'Start here. This is your simple day-wise study plan: learn, write, practice, explain, project proof.' },
+    { title: '2. Daily Practice', path: '/practice', icon: '💻', text: 'Practice Salesforce, DSA, scenario questions and mark topics Weak or Strong.' },
+    { title: '3. AI Mentor', path: '/ai-mentor', icon: '🤖', text: 'Ask doubts. It uses your saved app data and gives beginner + interview + architect guidance.' },
+    { title: '4. Automation Center', path: '/final-premium', icon: '⚙️', text: 'Use this for reminders, weak-topic queues, Sunday tests, backup, and job-ready score automation.' },
+    { title: '5. Career Prep', path: '/interview', icon: '🎤', text: 'Build interview answers, projects, resume proof, job tracker and weekly reports.' },
+  ];
+  const toolGroups = [
+    { title: 'Learn', items: [['Learning Plan','/zero-to-hero'], ['Daily Route','/mentor-route'], ['Learning Coach','/learning-coach'], ['English Practice','/english']] },
+    { title: 'Practice', items: [['Question Bank','/practice'], ['Scenario Practice','/scenarios'], ['Use Cases','/use-cases'], ['Weekly Tests','/weekly-tests']] },
+    { title: 'Prepare Job', items: [['Interview Room','/interview'], ['My Projects','/projects'], ['Resume Optimizer','/resume'], ['JD Matcher','/jd-matcher']] },
+    { title: 'Track & Automate', items: [['24h Tracker','/time-tracker'], ['Job Tracker','/job-tracker'], ['Automation Center','/final-premium'], ['Backup','/backup']] },
+  ];
   return <Layout><Page>
-    <Hero title="Dashboard Command Center" subtitle="Job Ready % real saved work se calculate hota hai: tasks complete, answers save, strong marks, weekly tests aur job pipeline.">
+    <Hero title="Home Guide" subtitle="This app is organized into one simple workflow: Learning Plan → Daily Practice → AI Mentor → Automation Center → Career Prep.">
       <div className="scoreCircle"><b>{score}%</b><span>Job Ready</span></div>
     </Hero>
+
+    <Card title="Understand the App in 30 Seconds" subtitle="Use these pages in this order. You do not need to open everything every day.">
+      <div className="easyFlow3d">{workflow.map(item => <Link key={item.title} className="easyStep3d" to={item.path}><span>{item.icon}</span><b>{item.title}</b><p>{item.text}</p><small>Open</small></Link>)}</div>
+    </Card>
+
     <div className="statsGrid">
-      <Stat icon="🎯" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce} • DSA: ${today.dsa}`}/>
+      <Stat icon="🎯" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce}`}/>
       <Stat icon="✅" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
       <Stat icon="📝" label="Saved Answers" value={savedAnswers} note="Mentor + Practice + Interview"/>
       <Stat icon="💪" label="Strong Topics" value={strong} note="Based on markings"/>
@@ -66,10 +82,14 @@ export function Dashboard() {
       <Stat icon="🧪" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Saved results"/>
       <Stat icon="🧭" label="Route Done" value={`${routeDoneToday}/6`} note={`Day ${activeDay} tasks`}/>
     </div>
+
     <div className="grid2">
-      <Card title="Current Work Plan" subtitle="Dashboard current day ke saved data se connected hai"><div className="mission"><p><b>Salesforce:</b> {today.salesforce}</p><p><b>DSA:</b> {today.dsa}</p><p><b>System Design:</b> {today.systemDesign}</p><p><b>Project:</b> {today.projectTask}</p><p><b>Interview:</b> {today.interviewTask}</p><Link className="btn cyan" to="/mentor-route">Open Mentor Route</Link></div></Card>
-      <Card title="Progress Breakdown" subtitle="Base 25% + real work tracking"><p>24h tasks</p><Progress value={totalTasks ? completedTasks/totalTasks*100 : 0}/><p>Saved answers</p><Progress value={Math.min(100,savedAnswers*4)}/><p>Strong topics</p><Progress value={Math.min(100,strong*5)}/><p>Job pipeline</p><Progress value={Math.min(100,applied*2)}/></Card>
+      <Card title="Today Focus" subtitle="Do only these things first"><div className="mission"><p><b>Salesforce:</b> {today.salesforce}</p><p><b>DSA:</b> {today.dsa}</p><p><b>System Design:</b> {today.systemDesign}</p><p><b>Project:</b> {today.projectTask}</p><p><b>Interview:</b> {today.interviewTask}</p><Link className="btn cyan" to="/zero-to-hero">Open Learning Plan</Link></div></Card>
+      <Card title="Progress Breakdown" subtitle="Your score increases from real saved work"><p>24h tasks</p><Progress value={totalTasks ? completedTasks/totalTasks*100 : 0}/><p>Saved answers</p><Progress value={Math.min(100,savedAnswers*4)}/><p>Strong topics</p><Progress value={Math.min(100,strong*5)}/><p>Job pipeline</p><Progress value={Math.min(100,applied*2)}/></Card>
     </div>
-    <Card title="Quick Open Tools" subtitle="Dashboard se sab pages connected hain"><div className="toolGrid">{launchers.map((x,i)=><Link key={x} className="toolTile" to={routes[i]}><b>{x}</b><span>Open Tool</span></Link>)}</div></Card>
+
+    <Card title="Tools Grouped by Purpose" subtitle="No confusion: choose the group based on what you want to do now.">
+      <div className="grid2">{toolGroups.map(group => <div className="previewCard" key={group.title}><h3>{group.title}</h3><div className="toolGrid compactToolGrid">{group.items.map(([label, path]) => <Link key={label} className="toolTile" to={path}><b>{label}</b><span>Open</span></Link>)}</div></div>)}</div>
+    </Card>
   </Page></Layout>;
 }
