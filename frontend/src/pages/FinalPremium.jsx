@@ -21,34 +21,65 @@ function collectLocalData(){
 }
 function countLocal(){ return Object.keys(collectLocalData()).length; }
 function pct(n){ return Math.max(0, Math.min(100, Math.round(n))); }
+function todayKey(){ return new Date().toISOString().slice(0,10); }
+function weekKey(){ const d=new Date(); const start=new Date(d.getFullYear(),0,1); return `${d.getFullYear()}-W${Math.ceil((((d-start)/86400000)+start.getDay()+1)/7)}`; }
 function getScore(){
   const jobs = readStore('jobs',[]); const applied = Array.isArray(jobs) ? jobs.filter(j=>j.applied || j.status==='Applied').length : 0;
   const weak = Object.values(readStore('weakStrong',{})).filter(v=>v==='Weak').length;
   const strong = Object.values(readStore('weakStrong',{})).filter(v=>v==='Strong').length;
-  const answers = Object.keys(readStore('premiumAnswers',{})).length + Object.keys(readStore('interviewAnswersV2',{})).length;
+  const answers = Object.keys(readStore('premiumAnswers',{})).length + Object.keys(readStore('interviewAnswersV2',{})).length + Object.keys(readStore('focusAnswers',{})).length;
   return pct(20 + strong*4 + answers*2 + applied*3 - weak);
+}
+function makeRoadmap(){
+  const weak = Object.entries(readStore('weakStrong',{})).filter(([,v])=>v==='Weak').map(([k])=>k);
+  const topic = weak[0] || 'Apex Trigger / LWC / Flow';
+  return `1. Revise weak topic: ${topic}\n2. Save 1 interview answer in STAR format\n3. Complete 45-minute focus sprint\n4. Apply/follow up to 3 Salesforce jobs\n5. Add one project proof or production issue note`;
 }
 function makeReport(state){
   return `FINAL PREMIUM REPORT\n\nJob Ready Score: ${getScore()}%\nGoal: ${state.goal}\nToday Roadmap:\n${state.roadmap}\nStandup:\n${state.standup}\nMonthly Review:\n${state.monthly}\n`; 
 }
+function runAutomation(state){
+  const date=todayKey(); const wk=weekKey();
+  const history=readStore('automationHistory',{});
+  const notifications=[...(state.notifications||[])];
+  const patches={};
+  if(history.lastDaily!==date){
+    patches.roadmap=makeRoadmap();
+    patches.standup=`Yesterday: Review saved work\nToday: Complete roadmap for ${date}\nBlockers: Write blockers here`;
+    notifications.unshift({id:Date.now()+1,text:'Auto daily roadmap generated',date:new Date().toLocaleString()});
+    history.lastDaily=date;
+    const streak=readStore('streak',0)+1; writeStore('streak',streak);
+  }
+  if(history.lastWeekly!==wk && new Date().getDay()===0){
+    notifications.unshift({id:Date.now()+2,text:'Sunday weekly report is ready to export',date:new Date().toLocaleString()});
+    history.lastWeekly=wk;
+  }
+  patches.notifications=notifications.slice(0,30);
+  writeStore('automationHistory',history);
+  return {...state,...patches,automationOn:true,lastAutomation:new Date().toLocaleString()};
+}
 
 export function FinalPremium(){
-  const [state,setState]=React.useState(()=>readStore('finalPremium',{goal:'Become job-ready Salesforce Developer',roadmap:'1. Revise weak topic\n2. Save one interview answer\n3. Apply to 3 jobs\n4. Build one project proof',standup:'Yesterday: \nToday: \nBlockers: ',monthly:'Skills improved: \nGaps: \nNext month plan: ',jd:'',resume:'',company:'TCS',recruiter:'',offerStage:'Wishlist',voiceNote:'',mockNote:'',settings:'Dark glass theme, compact cards, premium dashboard',profile:'Abhishek Kumar - Salesforce Developer',notifications:[],done:{}}));
+  const [state,setState]=React.useState(()=>readStore('finalPremium',{goal:'Become job-ready Salesforce Developer',roadmap:'1. Revise weak topic\n2. Save one interview answer\n3. Apply to 3 jobs\n4. Build one project proof',standup:'Yesterday: \nToday: \nBlockers: ',monthly:'Skills improved: \nGaps: \nNext month plan: ',jd:'',resume:'',company:'TCS',recruiter:'',offerStage:'Wishlist',voiceNote:'',mockNote:'',settings:'Dark glass theme, compact cards, premium dashboard',profile:'Abhishek Kumar - Salesforce Developer',notifications:[],done:{},automationOn:true}));
   const save=p=>{const n={...state,...p}; setState(n); writeStore('finalPremium',n);};
+  React.useEffect(()=>{ if(state.automationOn!==false){ const n=runAutomation(state); setState(n); writeStore('finalPremium',n); } },[]);
   const toggle=f=>save({done:{...state.done,[f]:!state.done?.[f]}});
   const completed=Object.values(state.done||{}).filter(Boolean).length;
   const finalScore=getScore();
   const localCount=countLocal();
   const words=state.jd.toLowerCase().split(/\W+/).filter(w=>w.length>3); const matched=[...new Set(words)].filter(w=>state.resume.toLowerCase().includes(w)); const gap=[...new Set(words)].filter(w=>!state.resume.toLowerCase().includes(w)).slice(0,20);
   const addNotification=t=>save({notifications:[{id:Date.now(),text:t,date:new Date().toLocaleString()},...(state.notifications||[])]});
+  const runNow=()=>{ const n=runAutomation({...state,automationOn:true}); setState(n); writeStore('finalPremium',n); };
 
   return <Layout><Page>
-    <Hero title="Final Premium Command Center" subtitle="Final layer: analytics, roadmap, reports, recruiter CRM, portfolio publish, backup, profile, settings, alerts, export and final job-ready gate."><div className="scoreMini"><b>{finalScore}%</b><small>Final Job Ready Score</small><Progress value={finalScore}/></div></Hero>
-    <div className="statsGrid"><div className="stat"><span>🏁</span><p>Final Score</p><b>{finalScore}%</b><small>job-ready gate</small></div><div className="stat"><span>✅</span><p>Final Features</p><b>{completed}/40</b><small>premium active</small></div><div className="stat"><span>💾</span><p>Local Data</p><b>{localCount}</b><small>storage items</small></div><div className="stat"><span>🔔</span><p>Alerts</p><b>{state.notifications.length}</b><small>notification center</small></div></div>
+    <Hero title="Final Premium Command Center" subtitle="Automated premium layer: auto daily roadmap, reminders, score, reports, alerts, local data health, backup and final job-ready gate."><div className="scoreMini"><b>{finalScore}%</b><small>Final Job Ready Score</small><Progress value={finalScore}/></div></Hero>
+    <div className="statsGrid"><div className="stat"><span>🏁</span><p>Final Score</p><b>{finalScore}%</b><small>job-ready gate</small></div><div className="stat"><span>🤖</span><p>Automation</p><b>{state.automationOn===false?'OFF':'ON'}</b><small>{state.lastAutomation||'ready'}</small></div><div className="stat"><span>💾</span><p>Local Data</p><b>{localCount}</b><small>storage items</small></div><div className="stat"><span>🔔</span><p>Alerts</p><b>{state.notifications.length}</b><small>notification center</small></div></div>
+
+    <Card title="Automation Control Center" subtitle="Auto-generate roadmap, standup, reminders, streak and weekly Sunday report alert."><div className="row"><button className="btn cyan" onClick={runNow}>Run Automation Now</button><button className="btn ghost" onClick={()=>save({automationOn:state.automationOn===false})}>{state.automationOn===false?'Turn Automation ON':'Turn Automation OFF'}</button><button className="btn ghost" onClick={()=>{writeStore('automationHistory',{}); addNotification('Automation history reset');}}>Reset Automation History</button></div><p className="continueCard">Automation runs when this page opens. It updates today plan once per day and weekly report reminder every Sunday.</p></Card>
 
     <Card title="AI Learning Analytics Dashboard"><div className="dashboardPreviewGrid"><div className="previewCard"><b>Habit Score</b><Progress value={pct(50+completed)}/></div><div className="previewCard"><b>Answer Score History</b><div className="heatmap">{Array.from({length:30},(_,i)=><span key={i} className={i%3?'on':''}/>)}</div></div><div className="previewCard"><b>Focus Risk Warning</b><p>{completed<10?'Need more daily proof and saved answers.':'Good consistency. Maintain streak.'}</p></div></div></Card>
 
-    <Card title="Personalized Daily Roadmap + Auto Interview Revision Plan"><textarea value={state.roadmap} onChange={e=>save({roadmap:e.target.value})}/><div className="row"><button className="btn cyan" onClick={()=>save({roadmap:'1. Complete one weak topic revision\n2. Record one mock interview answer\n3. Update resume with one project bullet\n4. Apply to 3 Salesforce jobs\n5. Generate weekly proof report'})}>Generate Roadmap</button><button className="btn ghost" onClick={()=>addNotification('Revision reminder added for today')}>Add Reminder</button></div></Card>
+    <Card title="Personalized Daily Roadmap + Auto Interview Revision Plan"><textarea value={state.roadmap} onChange={e=>save({roadmap:e.target.value})}/><div className="row"><button className="btn cyan" onClick={()=>save({roadmap:makeRoadmap()})}>Generate Roadmap</button><button className="btn ghost" onClick={()=>addNotification('Revision reminder added for today')}>Add Reminder</button></div></Card>
 
     <Card title="Topic Dependency Graph + Architecture Visual Builder"><div className="architectureBox"><div>Admin Basics</div><div>Security</div><div>Flow</div><div>Apex</div><div>LWC</div><div>Integration</div><div>Testing</div><div>Deployment</div></div><textarea placeholder="Architecture notes: UI, API, Apex, Flow, DB, security, reports" onBlur={e=>writeStore('architectureNotes',e.target.value)}/></Card>
 
