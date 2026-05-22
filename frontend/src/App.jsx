@@ -12,6 +12,7 @@ import { Backup, Documents, Doubts, Journal, Notes, TimeTracker } from './pages/
 import { Certifications, ResumeOptimizer } from './pages/ResumeCert';
 import { PremiumFeatures } from './pages/PremiumFeatures';
 import { FinalPremium } from './pages/FinalPremium';
+import { ZeroToHeroArchitect } from './pages/ZeroToHeroArchitect';
 
 function Protected({ children }) {
   const session = readStore('session', null);
@@ -29,6 +30,7 @@ export default function App() {
     <Route path="/mentor-route" element={<Protected><MentorRoute/></Protected>}/>
     <Route path="/focus" element={<Protected><FocusMode/></Protected>}/>
     <Route path="/learning-coach" element={<Protected><LearningCoach/></Protected>}/>
+    <Route path="/zero-to-hero" element={<Protected><ZeroToHeroArchitect/></Protected>}/>
     <Route path="/english" element={<Protected><English100/></Protected>}/>
     <Route path="/practice" element={<Protected><PracticeLab/></Protected>}/>
     <Route path="/scenarios" element={<Protected><ScenarioQuestions/></Protected>}/>
