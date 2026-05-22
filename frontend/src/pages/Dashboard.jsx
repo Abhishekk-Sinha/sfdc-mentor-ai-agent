@@ -51,11 +51,23 @@ export function Dashboard() {
   const totalTasks = tasks.length;
   const routeDoneToday = Object.keys(mentorDone).filter(k => k.startsWith(`${activeDay}-`) && mentorDone[k]).length;
 
+  const heroStats = [
+    ['Day', `Day ${activeDay}`],
+    ['Saved', savedAnswers],
+    ['Strong', strong],
+    ['Jobs', applied],
+  ];
   const quickStart = [
     ['❓', 'Question Bank', '/practice', 'Practice DSA, Salesforce and System Design.'],
     ['🤖', 'AI Mentor', '/ai-mentor', 'Ask doubts and improve answers.'],
     ['✨', 'Focus Practice', '/focus', 'Save answers and mark weak/strong.'],
     ['💼', 'Job Tracker', '/job-tracker', 'Track applications and follow-ups.'],
+  ];
+  const premiumPath = [
+    ['01', 'Practice', 'Solve one question set', '/practice'],
+    ['02', 'Mentor', 'Clear one doubt', '/ai-mentor'],
+    ['03', 'Proof', 'Save one strong answer', '/focus'],
+    ['04', 'Career', 'Update job or interview prep', '/job-tracker'],
   ];
   const toolGroups = [
     { title: 'Daily Study', items: [['AI Mentor','/ai-mentor','🤖'], ['Daily Route','/mentor-route','🛣️'], ['Learning Coach','/learning-coach','📘'], ['English Practice','/english','🗣️']] },
@@ -65,9 +77,17 @@ export function Dashboard() {
   ];
 
   return <Layout><Page>
-    <Hero title="Home Guide" subtitle="Your clean Salesforce Career OS: Question Bank -> AI Mentor -> Focus Practice -> Career Prep. Automation runs silently in the background.">
-      <div className="scoreCircle"><b>{score}%</b><span>Job Ready</span></div>
-    </Hero>
+    <section className="dashboardHeroPro">
+      <div className="dashboardHeroContent">
+        <p className="eyebrow">SFDC Mentor Career OS</p>
+        <h1>Home Guide</h1>
+        <p>Your premium control room for practice, AI guidance, interview preparation, job tracking and daily proof.</p>
+        <div className="dashboardHeroActions"><Link className="btn cyan" to="/practice">Start Practice</Link><Link className="btn ghost" to="/ai-mentor">Ask AI Mentor</Link><Link className="btn ghost" to="/interview">Interview Room</Link></div>
+      </div>
+      <div className="dashboardScorePanel"><div className="scoreCircle"><b>{score}%</b><span>Job Ready</span></div><div className="heroMiniStats">{heroStats.map(([label, value]) => <div key={label}><b>{value}</b><span>{label}</span></div>)}</div></div>
+    </section>
+
+    <div className="premiumCommandStrip">{premiumPath.map(([num, title, text, path]) => <Link key={title} to={path}><b>{num}</b><span>{title}</span><small>{text}</small></Link>)}</div>
 
     <div className="premiumHomeGrid">
       <Card title="Today Task" subtitle="Start with the most useful action."><div className="homeFocusCard"><span>🎯</span><b>Day {activeDay}: {today.salesforce}</b><p>Complete one practice set, save one answer, and track one proof item today.</p><Link className="btn cyan" to="/practice">Start Question Bank</Link></div></Card>
@@ -76,7 +96,7 @@ export function Dashboard() {
       <Card title="Quick Start" subtitle="Open the right page fast."><div className="quickStartStack">{quickStart.map(([icon,title,to,text]) => <Link key={title} to={to}><span>{icon}</span><div><b>{title}</b><small>{text}</small></div></Link>)}</div></Card>
     </div>
 
-    <div className="statsGrid">
+    <div className="statsGrid premiumStatsGrid">
       <Stat icon="📅" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce}`}/>
       <Stat icon="✅" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
       <Stat icon="📝" label="Saved Answers" value={savedAnswers} note="Mentor + Practice + Interview"/>
@@ -87,9 +107,10 @@ export function Dashboard() {
       <Stat icon="🧭" label="Route Done" value={`${routeDoneToday}/6`} note={`Day ${activeDay} tasks`}/>
     </div>
 
-    <div className="grid2">
+    <div className="dashboardDeepGrid">
       <Card title="Today Focus" subtitle="Do only these things first"><div className="mission"><p><b>Salesforce:</b> {today.salesforce}</p><p><b>DSA:</b> {today.dsa}</p><p><b>System Design:</b> {today.systemDesign}</p><p><b>Project:</b> {today.projectTask}</p><p><b>Interview:</b> {today.interviewTask}</p><Link className="btn cyan" to="/practice">Open Question Bank</Link></div></Card>
       <Card title="Progress Breakdown" subtitle="Your score increases from real saved work"><p>24h tasks</p><Progress value={totalTasks ? completedTasks/totalTasks*100 : 0}/><p>Saved answers</p><Progress value={Math.min(100,savedAnswers*4)}/><p>Strong topics</p><Progress value={Math.min(100,strong*5)}/><p>Job pipeline</p><Progress value={Math.min(100,applied*2)}/></Card>
+      <Card title="Career Momentum" subtitle="Keep one visible daily proof."><div className="careerMomentum"><div><b>{applied}</b><span>Applications</span></div><div><b>{savedAnswers}</b><span>Saved Answers</span></div><div><b>{Object.keys(weeklyResults).length}</b><span>Weekly Tests</span></div></div><p className="hint">Best next action: save one interview answer and update one job note.</p></Card>
     </div>
 
     <Card title="Tools Grouped by Purpose" subtitle="Clean final flow. Choose the group based on what you want to do now."><div className="grid2">{toolGroups.map(group => <div className="previewCard" key={group.title}><h3>{group.title}</h3><div className="toolGrid compactToolGrid">{group.items.map(([label, path, icon]) => <Link key={label} className="toolTile" to={path}><b>{icon} {label}</b><span>Open</span></Link>)}</div></div>)}</div></Card>
