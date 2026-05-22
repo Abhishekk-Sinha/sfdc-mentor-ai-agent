@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link } from 'react-router-dom';
 import { companies } from '../data/companies';
 import { roadmap90 } from '../data/roadmap';
@@ -51,11 +51,11 @@ export function Dashboard() {
   const totalTasks = tasks.length;
   const routeDoneToday = Object.keys(mentorDone).filter(k => k.startsWith(`${activeDay}-`) && mentorDone[k]).length;
   const workflow = [
-    { title: '1. Learning Plan', path: '/zero-to-hero', icon: '🎯', text: 'Start here. This is your simple day-wise study plan: learn, write, practice, explain, project proof.' },
-    { title: '2. Daily Practice', path: '/practice', icon: '💻', text: 'Practice Salesforce, DSA, scenario questions and mark topics Weak or Strong.' },
-    { title: '3. AI Mentor', path: '/ai-mentor', icon: '🤖', text: 'Ask doubts. It uses your saved app data and gives beginner + interview + architect guidance.' },
-    { title: '4. Automation Center', path: '/final-premium', icon: '⚙️', text: 'Use this for reminders, weak-topic queues, Sunday tests, backup, and job-ready score automation.' },
-    { title: '5. Career Prep', path: '/interview', icon: '🎤', text: 'Build interview answers, projects, resume proof, job tracker and weekly reports.' },
+    { title: '1. Learning Plan', path: '/zero-to-hero', icon: 'ðŸŽ¯', text: 'Start here. This is your simple day-wise study plan: learn, write, practice, explain, project proof.' },
+    { title: '2. Daily Practice', path: '/practice', icon: 'ðŸ’»', text: 'Practice Salesforce, DSA, scenario questions and mark topics Weak or Strong.' },
+    { title: '3. AI Mentor', path: '/ai-mentor', icon: 'ðŸ¤–', text: 'Ask doubts. It uses your saved app data and gives beginner + interview + architect guidance.' },
+    { title: '4. Automation Center', path: '/final-premium', icon: 'âš™ï¸', text: 'Use this for reminders, weak-topic queues, Sunday tests, backup, and job-ready score automation.' },
+    { title: '5. Career Prep', path: '/interview', icon: 'ðŸŽ¤', text: 'Build interview answers, projects, resume proof, job tracker and weekly reports.' },
   ];
   const toolGroups = [
     { title: 'Learn', items: [['Learning Plan','/zero-to-hero'], ['Daily Route','/mentor-route'], ['Learning Coach','/learning-coach'], ['English Practice','/english']] },
@@ -64,23 +64,51 @@ export function Dashboard() {
     { title: 'Track & Automate', items: [['24h Tracker','/time-tracker'], ['Job Tracker','/job-tracker'], ['Automation Center','/final-premium'], ['Backup','/backup']] },
   ];
   return <Layout><Page>
-    <Hero title="Home Guide" subtitle="This app is organized into one simple workflow: Learning Plan → Daily Practice → AI Mentor → Automation Center → Career Prep.">
+    <Hero title="Home Guide" subtitle="This app is organized into one simple workflow: Learning Plan â†’ Daily Practice â†’ AI Mentor â†’ Automation Center â†’ Career Prep.">
       <div className="scoreCircle"><b>{score}%</b><span>Job Ready</span></div>
     </Hero>
+    <Card title="Start Here: Today's Simple Path" subtitle="Open only these steps first. This keeps the app easy and avoids confusion.">
+      <div className="dailyPathGrid">
+        <Link className="dailyPathCard" to="/zero-to-hero"><span>ðŸŽ¯</span><small>Step 1 â€¢ 30 min</small><b>Learn one concept</b><p>Open Learning Plan and understand today's Salesforce topic.</p></Link>
+        <Link className="dailyPathCard" to="/practice"><span>ðŸ’»</span><small>Step 2 â€¢ 30 min</small><b>Practice one set</b><p>Solve questions and save your answer inside the app.</p></Link>
+        <Link className="dailyPathCard" to="/focus"><span>âœï¸</span><small>Step 3 â€¢ 20 min</small><b>Write one answer</b><p>Save the answer, then mark it Weak or Strong.</p></Link>
+        <Link className="dailyPathCard" to="/ai-mentor"><span>ðŸ¤–</span><small>Step 4 â€¢ 15 min</small><b>Ask one doubt</b><p>Use AI Mentor and save useful guidance to notes.</p></Link>
+        <Link className="dailyPathCard" to="/time-tracker"><span>â±ï¸</span><small>Step 5 â€¢ 5 min</small><b>Track proof</b><p>Mark completed work so your progress becomes real.</p></Link>
+      </div>
+    </Card>
+
+    <Card title="Beginner Tools Only" subtitle="For daily use, focus on these pages. All advanced features are still available from the sidebar.">
+      <div className="toolGrid compactToolGrid">
+        <Link className="toolTile" to="/zero-to-hero"><b>Learning Plan</b><span>Start here</span></Link>
+        <Link className="toolTile" to="/practice"><b>Question Bank</b><span>Practice</span></Link>
+        <Link className="toolTile" to="/focus"><b>Focus Practice</b><span>Save answers</span></Link>
+        <Link className="toolTile" to="/ai-mentor"><b>AI Mentor</b><span>Ask doubts</span></Link>
+        <Link className="toolTile" to="/time-tracker"><b>24h Tracker</b><span>Track proof</span></Link>
+        <Link className="toolTile" to="/interview"><b>Interview Room</b><span>Prepare</span></Link>
+      </div>
+    </Card>
+
+    <Card title="Simple Daily Rule" subtitle="Follow this rule every day to become consistent.">
+      <div className="simpleRuleGrid">
+        <div><b>1 Concept</b><span>Understand one Salesforce concept deeply.</span></div>
+        <div><b>1 Practice</b><span>Solve one question set and save your answer.</span></div>
+        <div><b>1 Proof</b><span>Track time, mark progress, and create interview proof.</span></div>
+      </div>
+    </Card>
 
     <Card title="Understand the App in 30 Seconds" subtitle="Use these pages in this order. You do not need to open everything every day.">
       <div className="easyFlow3d">{workflow.map(item => <Link key={item.title} className="easyStep3d" to={item.path}><span>{item.icon}</span><b>{item.title}</b><p>{item.text}</p><small>Open</small></Link>)}</div>
     </Card>
 
     <div className="statsGrid">
-      <Stat icon="🎯" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce}`}/>
-      <Stat icon="✅" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
-      <Stat icon="📝" label="Saved Answers" value={savedAnswers} note="Mentor + Practice + Interview"/>
-      <Stat icon="💪" label="Strong Topics" value={strong} note="Based on markings"/>
-      <Stat icon="⚠️" label="Weak Topics" value={weak} note="Plan revision"/>
-      <Stat icon="💼" label="Applied" value={applied} note="Job pipeline"/>
-      <Stat icon="🧪" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Saved results"/>
-      <Stat icon="🧭" label="Route Done" value={`${routeDoneToday}/6`} note={`Day ${activeDay} tasks`}/>
+      <Stat icon="ðŸŽ¯" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce}`}/>
+      <Stat icon="âœ…" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
+      <Stat icon="ðŸ“" label="Saved Answers" value={savedAnswers} note="Mentor + Practice + Interview"/>
+      <Stat icon="ðŸ’ª" label="Strong Topics" value={strong} note="Based on markings"/>
+      <Stat icon="âš ï¸" label="Weak Topics" value={weak} note="Plan revision"/>
+      <Stat icon="ðŸ’¼" label="Applied" value={applied} note="Job pipeline"/>
+      <Stat icon="ðŸ§ª" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Saved results"/>
+      <Stat icon="ðŸ§­" label="Route Done" value={`${routeDoneToday}/6`} note={`Day ${activeDay} tasks`}/>
     </div>
 
     <div className="grid2">
