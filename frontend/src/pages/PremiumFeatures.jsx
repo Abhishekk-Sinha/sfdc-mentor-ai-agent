@@ -1,13 +1,13 @@
-import React from 'react';
+﻿import React from 'react';
 import { Card, Hero, Layout, Page, Progress } from '../components/UI';
 import { readStore, writeStore, downloadText } from '../utils/storage';
 
 const featureGroups = [
-  { group: 'AI Career Coach', icon: '🤖', items: ['AI Career Coach Mode','Daily Auto Mission Generator','One-click Today Plan','Smart Next Best Action','AI Resume Bullet Generator','AI Interview Answer Reviewer','Answer Quality Score','STAR Answer Builder','AI Doubt Solver with History','Scenario Question Generator'] },
-  { group: 'Interview & Roles', icon: '🎤', items: ['Mock Interview Timer','Company-wise Interview Prep','Role-wise Prep Admin','Role-wise Prep Developer','Role-wise Prep LWC','Role-wise Prep Apex','Salesforce Topic Mastery Map','Skill Tree View','Learning Roadmap Timeline','AI Assistant System Design 50 Questions'] },
-  { group: 'Revision & Mastery', icon: '📅', items: ['90-Day Calendar View','Revision Reminder System','Weak Topic Auto Revision List','Daily Streak Badge','Achievement Badge System','XP / Level System','Progress Heatmap','Weekly Report Generator','Sunday Test Auto Summary'] },
-  { group: 'Projects & Architecture', icon: '🏗️', items: ['Project Case Study Builder','Architecture Diagram Section','Real-time Use Case Library','Deployment Checklist','Apex Trigger Checklist','LWC Component Checklist','Flow Debug Checklist','Integration Checklist'] },
-  { group: 'Career & Resume', icon: '💼', items: ['Job Application Kanban Board','Follow-up Reminder Tracker','Recruiter Contact Tracker','JD Keyword Heatmap','ATS Resume Score Visualizer','Resume Version Manager','Portfolio Live Preview Editor','Public Portfolio Share Mode','PDF Resume Preview','Word Resume Preview','Download Portfolio as PDF'] },
+  { group: 'AI Career Coach', icon: 'ðŸ¤–', items: ['AI Career Coach Mode','Daily Auto Mission Generator','One-click Today Plan','Smart Next Best Action','AI Resume Bullet Generator','AI Interview Answer Reviewer','Answer Quality Score','STAR Answer Builder','AI Doubt Solver with History','Scenario Question Generator'] },
+  { group: 'Interview & Roles', icon: 'ðŸŽ¤', items: ['Mock Interview Timer','Company-wise Interview Prep','Role-wise Prep Admin','Role-wise Prep Developer','Role-wise Prep LWC','Role-wise Prep Apex','Salesforce Topic Mastery Map','Skill Tree View','Learning Roadmap Timeline','AI Assistant System Design 50 Questions'] },
+  { group: 'Revision & Mastery', icon: 'ðŸ“…', items: ['90-Day Calendar View','Revision Reminder System','Weak Topic Auto Revision List','Daily Streak Badge','Achievement Badge System','XP / Level System','Progress Heatmap','Weekly Report Generator','Sunday Test Auto Summary'] },
+  { group: 'Projects & Architecture', icon: 'ðŸ—ï¸', items: ['Project Case Study Builder','Architecture Diagram Section','Real-time Use Case Library','Deployment Checklist','Apex Trigger Checklist','LWC Component Checklist','Flow Debug Checklist','Integration Checklist'] },
+  { group: 'Career & Resume', icon: 'ðŸ’¼', items: ['Job Application Kanban Board','Follow-up Reminder Tracker','Recruiter Contact Tracker','JD Keyword Heatmap','ATS Resume Score Visualizer','Resume Version Manager','Portfolio Live Preview Editor','Public Portfolio Share Mode','PDF Resume Preview','Word Resume Preview','Download Portfolio as PDF'] },
 ];
 
 const aiSystemDesignQuestions = Array.from({ length: 50 }, (_, i) => {
@@ -82,10 +82,29 @@ export function PremiumFeatures() {
     <Hero title="Premium Career Command Center" subtitle="AI coach, interview reviewer, job kanban, resume tools, revision, checklists, project case studies and AI assistant system design questions.">
       <div className="scoreMini"><b>Level {level}</b><small>{xp} XP</small><Progress value={Math.min(100,xp%100)} /></div>
     </Hero>
+    <Card title="Advanced Tools Map" subtitle="Page â†’ Sub-page structure. Use this map to understand which tool belongs where. No feature is removed.">
+      <div className="advancedMapGrid">
+        <a href="#learning-intelligence" className="advancedMapCard"><span>ðŸ§ </span><b>Learning Intelligence</b><small>Mastery â€¢ skill tree â€¢ revision â€¢ heatmap</small><p>Use when you want to know what to learn next.</p></a>
+        <a href="#interview-mastery" className="advancedMapCard"><span>ðŸŽ¤</span><b>Interview Mastery</b><small>Mock timer â€¢ STAR â€¢ reviewer â€¢ system design</small><p>Use when preparing for Salesforce interviews.</p></a>
+        <a href="#project-architecture" className="advancedMapCard"><span>ðŸ—ï¸</span><b>Project & Architecture</b><small>Case study â€¢ diagram â€¢ checklists</small><p>Use when building project proof and architect thinking.</p></a>
+        <a href="#resume-portfolio" className="advancedMapCard"><span>ðŸ“„</span><b>Resume & Portfolio</b><small>ATS â€¢ version â€¢ PDF/Word â€¢ portfolio share</small><p>Use when improving your recruiter profile.</p></a>
+        <a href="#job-search-os" className="advancedMapCard"><span>ðŸ’¼</span><b>Job Search OS</b><small>Kanban â€¢ follow-up â€¢ recruiter tracker</small><p>Use when applying and tracking companies.</p></a>
+        <a href="#automation-reports" className="advancedMapCard"><span>âš™ï¸</span><b>Automation & Reports</b><small>Weekly report â€¢ Sunday summary â€¢ reminders</small><p>Use when you need auto guidance and reports.</p></a>
+        <a href="#data-backup" className="advancedMapCard"><span>ðŸ’¾</span><b>Data & Backup</b><small>Export â€¢ saved answers â€¢ local data</small><p>Use when saving or exporting your progress.</p></a>
+      </div>
+    </Card>
 
-    <div className="statsGrid"><div className="stat"><span>🔥</span><p>Daily Streak</p><b>{readStore('streak',1)}</b><small>Keep learning daily</small></div><div className="stat"><span>🧠</span><p>Answer Quality</p><b>{answerScore}%</b><small>AI reviewer score</small></div><div className="stat"><span>✅</span><p>Checklist Done</p><b>{completedChecks}/{totalChecks}</b><small>Deployment ready habits</small></div><div className="stat"><span>📄</span><p>ATS Match</p><b>{ats}%</b><small>JD keyword heatmap</small></div></div>
+    <Card title="How to Use Advanced Tools" subtitle="Use advanced pages only after finishing the daily learning flow.">
+      <div className="subPageFlow">
+        <div><b>Daily</b><span>Learning Plan â†’ Practice â†’ AI Mentor â†’ Time Tracker</span></div>
+        <div><b>Weekly</b><span>Weekly Test â†’ Report â†’ Revision Queue â†’ Project Proof</span></div>
+        <div><b>Job Prep</b><span>Interview Mastery â†’ Resume/ATS â†’ Job Kanban â†’ Follow-up</span></div>
+      </div>
+    </Card>
 
-    <Card title="AI Career Coach Mode" subtitle="Daily mission, today plan, smart next action and career direction.">
+    <div className="statsGrid"><div className="stat"><span>ðŸ”¥</span><p>Daily Streak</p><b>{readStore('streak',1)}</b><small>Keep learning daily</small></div><div className="stat"><span>ðŸ§ </span><p>Answer Quality</p><b>{answerScore}%</b><small>AI reviewer score</small></div><div className="stat"><span>âœ…</span><p>Checklist Done</p><b>{completedChecks}/{totalChecks}</b><small>Deployment ready habits</small></div><div className="stat"><span>ðŸ“„</span><p>ATS Match</p><b>{ats}%</b><small>JD keyword heatmap</small></div></div>
+
+    <div id="learning-intelligence" className="anchorPoint"></div><Card title="AI Career Coach Mode" subtitle="Daily mission, today plan, smart next action and career direction.">
       <div className="grid2"><div><h3>One-click Today Plan</h3>{mission.map((m,i)=><p key={m} className="continueCard"><b>{i+1}. </b>{m}</p>)}<button className="btn cyan" onClick={()=>downloadText('today-plan.txt',mission.join('\n'))}>Export Today Plan</button></div><div><h3>Smart Next Best Action</h3><p className="continueCard">{weakTopics.length ? `Revise weak topic: ${weakTopics[0]}` : answerScore < 70 ? 'Improve one interview answer with STAR + impact.' : 'Apply to 3 Salesforce jobs and add follow-up reminder.'}</p><input value={coach.goal} onChange={e=>setCoach({...coach,goal:e.target.value})}/></div></div>
     </Card>
 
@@ -93,7 +112,7 @@ export function PremiumFeatures() {
       <div className="grid2"><div><textarea value={coach.answer} onChange={e=>setCoach({...coach,answer:e.target.value})} placeholder="Paste your answer here for review"/><Progress value={answerScore}/><div className="row"><button className="btn cyan" onClick={()=>saveAnswer('review-'+Date.now(),coach.answer)}>Save Review</button><button className="btn ghost" onClick={()=>setCoach({...coach,answer:`Situation: \nTask: \nAction: \nResult: \nTechnical depth: \nBusiness impact: `})}>STAR Builder</button></div><p className="continueCard">Resume bullet: Built Salesforce solution using Apex/LWC/Flow with security, testing and deployment readiness, improving business process visibility and maintainability.</p></div><div><textarea value={coach.jd} onChange={e=>setCoach({...coach,jd:e.target.value})} placeholder="Paste JD for keyword heatmap / ATS score"/><div className="atsKeywords">{matched.length?matched.map(w=><span key={w}>{w}</span>):<span>Paste JD to see matched keywords</span>}</div><button className="btn ghost" onClick={addVersion}>Save Resume Version</button></div></div>
     </Card>
 
-    <Card title="Mock Interview Timer + Company-wise Prep + Role-wise Prep" subtitle="Admin / Developer / LWC / Apex interview practice with timer.">
+    <div id="interview-mastery" className="anchorPoint"></div><Card title="Mock Interview Timer + Company-wise Prep + Role-wise Prep" subtitle="Admin / Developer / LWC / Apex interview practice with timer.">
       <div className="grid2"><div className="videoMock"><div className="playCircle">{Math.floor(timer/60)}:{String(timer%60).padStart(2,'0')}</div><div className="row"><button className="btn cyan" onClick={()=>setRunning(!running)}>{running?'Pause':'Start'}</button><button className="btn ghost" onClick={()=>setTimer(120)}>Reset 2m</button></div></div><div><input value={coach.company} onChange={e=>setCoach({...coach,company:e.target.value})} placeholder="Company name"/><button className="btn cyan" onClick={addJob}>Add Company Prep</button><div className="atsKeywords">{['Admin','Developer','LWC','Apex','Flow','Integration'].map(x=><span key={x}>{x}</span>)}</div></div></div>
     </Card>
 
@@ -102,14 +121,14 @@ export function PremiumFeatures() {
     </Card>
 
     <Card title="Revision Reminder + Weak Topic Auto Revision" subtitle="1/3/7/15/30 day revision loop.">
-      {weakTopics.length?weakTopics.map((w,i)=><p key={w} className="notificationCard"><b>{w}</b> • Revise on Day {1+i}, {3+i}, {7+i}, {15+i}, {30+i}</p>):<p className="premiumEmpty">No weak topics yet. Mark questions Weak from Focus/Interview to create auto revision list.</p>}
+      {weakTopics.length?weakTopics.map((w,i)=><p key={w} className="notificationCard"><b>{w}</b> â€¢ Revise on Day {1+i}, {3+i}, {7+i}, {15+i}, {30+i}</p>):<p className="premiumEmpty">No weak topics yet. Mark questions Weak from Focus/Interview to create auto revision list.</p>}
     </Card>
 
     <Card title="AI Doubt Solver with History + Real-time Use Case Library" subtitle="Save doubt history and generate scenario/use cases.">
       <div className="grid2"><textarea placeholder="Write doubt. AI local helper will structure it into concept, example, fix, revision." onBlur={e=>{if(e.target.value.trim()){const d=readStore('premiumDoubts',[]);writeStore('premiumDoubts',[{id:Date.now(),text:e.target.value,date:new Date().toLocaleString()},...d]);}}}/><div>{['Lead assignment automation','Approval process for discount','Secure patient appointment flow','Real estate listing search','External API sync failure handling'].map(x=><p className="continueCard" key={x}>{x}</p>)}</div></div>
     </Card>
 
-    <Card title="Project Case Study Builder + Architecture Diagram" subtitle="Create interview-ready project proof.">
+    <div id="project-architecture" className="anchorPoint"></div><Card title="Project Case Study Builder + Architecture Diagram" subtitle="Create interview-ready project proof.">
       <div className="architectureBox"><div>UI / LWC</div><div>Apex Service</div><div>Flow Automation</div><div>Security Layer</div><div>External API</div><div>Reports</div></div><textarea placeholder="Project case study: business problem, users, objects, automation/code, integration, security, test, deployment, impact." onBlur={e=>writeStore('projectCaseStudy',e.target.value)}/>
     </Card>
 
@@ -117,20 +136,21 @@ export function PremiumFeatures() {
       <div className="checklistGrid">{Object.entries(checklists).map(([key,list])=><div className="checklistCard" key={key}><h3>{key.toUpperCase()}</h3>{list.map((item,i)=><label key={i}><input type="checkbox" checked={!!item.done} onChange={()=>toggleChecklist(key,i)}/>{item.text||item}</label>)}</div>)}</div>
     </Card>
 
-    <Card title="Job Application Kanban + Follow-up + Recruiter Tracker" subtitle="Move jobs through pipeline.">
+    <div id="job-search-os" className="anchorPoint"></div><Card title="Job Application Kanban + Follow-up + Recruiter Tracker" subtitle="Move jobs through pipeline.">
       <div className="kanbanBoard">{Object.entries(kanban).map(([col,items])=><div className="kanbanColumn" key={col}><h3>{col.toUpperCase()}</h3>{items.map(item=><div className="continueCard" key={item}><b>{item}</b><div className="row">{Object.keys(kanban).filter(c=>c!==col).map(c=><button className="btn small ghost" key={c} onClick={()=>moveJob(col,c,item)}>{c}</button>)}</div></div>)}</div>)}</div>
     </Card>
 
-    <Card title="Resume Version Manager + Preview + Portfolio Share" subtitle="PDF/Word style preview, version manager, portfolio export.">
+    <div id="resume-portfolio" className="anchorPoint"></div><Card title="Resume Version Manager + Preview + Portfolio Share" subtitle="PDF/Word style preview, version manager, portfolio export.">
       <div className="grid2"><div>{versions.map(v=><p className="resumeVersion" key={v.id}><b>{v.name}</b><span>{v.date}</span><small>{v.notes}</small></p>)}</div><div className="row"><button className="btn cyan" onClick={addVersion}>Add Resume Version</button><button className="btn ghost" onClick={()=>exportPdfLike('resume-preview.pdf',JSON.stringify(versions,null,2))}>PDF Preview</button><button className="btn ghost" onClick={()=>downloadText('resume-preview.doc',JSON.stringify(versions,null,2),'application/msword')}>Word Preview</button><button className="btn ghost" onClick={()=>exportPdfLike('portfolio.pdf','Open /portfolio for public portfolio share mode')}>Download Portfolio PDF</button></div></div>
     </Card>
 
-    <Card title="Weekly Report Generator + Sunday Test Auto Summary" subtitle="One-click weekly report.">
+    <div id="automation-reports" className="anchorPoint"></div><Card title="Weekly Report Generator + Sunday Test Auto Summary" subtitle="One-click weekly report.">
       <button className="btn cyan" onClick={()=>downloadText('weekly-report.txt',`XP: ${xp}\nLevel: ${level}\nAnswer Score: ${answerScore}\nATS: ${ats}\nChecklist: ${completedChecks}/${totalChecks}\nMission:\n${mission.join('\n')}`)}>Generate Weekly Report</button>
     </Card>
 
-    <Card title="AI Assistant System Design Interview Questions - 50" subtitle="System design round prep for AI assistant / LLM apps.">
+    <div id="data-backup" className="anchorPoint"></div><Card title="AI Assistant System Design Interview Questions - 50" subtitle="System design round prep for AI assistant / LLM apps.">
       <div className="systemDesign50">{aiSystemDesignQuestions.map(q=><details key={q.id} className="sdQuestion"><summary><b>{q.title}</b><span className="pill">{q.level}</span></summary><p>{q.question}</p><textarea value={answers[q.id]?.text||''} onChange={e=>saveAnswer(q.id,e.target.value)} placeholder="Write your system design answer"/><p className="continueCard"><b>Model Structure:</b> {q.answer}</p><div className="row"><button className="btn small cyan" onClick={()=>saveAnswer(q.id,answers[q.id]?.text||q.answer)}>Save</button><button className="btn small ghost" onClick={()=>downloadText(`${q.id}.txt`,answers[q.id]?.text||q.answer)}>Export</button></div></details>)}</div>
     </Card>
   </Page></Layout>;
 }
+
