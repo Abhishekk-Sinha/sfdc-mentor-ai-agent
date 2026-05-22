@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Hero, Layout, Page, Progress } from '../components/UI';
 import { readStore, writeStore, downloadText } from '../utils/storage';
@@ -33,12 +33,12 @@ const conceptLibrary = [
 ];
 
 const dailySystem = [
-  { icon: '📘', title: 'Learn', text: 'Read one small concept. Do not jump to advanced topics first.' },
-  { icon: '📝', title: 'Write', text: 'Write a simple 5-line note: what, why, where, example, mistake.' },
-  { icon: '🧪', title: 'Practice', text: 'Solve one easy question, one scenario question, and one troubleshooting question.' },
-  { icon: '🎤', title: 'Explain', text: 'Speak a 60-second interview answer with definition, example, and impact.' },
-  { icon: '🏗️', title: 'Project Proof', text: 'Convert the topic into a project bullet for resume and interview.' },
-  { icon: '🔁', title: 'Review', text: 'Mark the topic Weak or Strong and add it to revision.' },
+  { icon: 'ðŸ“˜', title: 'Learn', text: 'Read one small concept. Do not jump to advanced topics first.' },
+  { icon: 'ðŸ“', title: 'Write', text: 'Write a simple 5-line note: what, why, where, example, mistake.' },
+  { icon: 'ðŸ§ª', title: 'Practice', text: 'Solve one easy question, one scenario question, and one troubleshooting question.' },
+  { icon: 'ðŸŽ¤', title: 'Explain', text: 'Speak a 60-second interview answer with definition, example, and impact.' },
+  { icon: 'ðŸ—ï¸', title: 'Project Proof', text: 'Convert the topic into a project bullet for resume and interview.' },
+  { icon: 'ðŸ”', title: 'Review', text: 'Mark the topic Weak or Strong and add it to revision.' },
 ];
 
 const microLessons = {
@@ -109,17 +109,25 @@ export function ZeroToHeroArchitect() {
   const exportPlan = () => downloadText('salesforce-accelerator-pro-plan.txt', `Program: ${APP_NAME} ${APP_VERSION}\nDay: ${day}\nTrack: ${state.track} days\nPhase: ${phase.name}\nReadiness: ${readiness}%\n\nMentor Plan:\n${state.mentorPlan}\n\nSimple Note:\n${state.simpleNote}\n\nScenario Answer:\n${state.scenarioAnswer}\n\nProject Proof:\n${state.projectProof}\n\nInterview Answer:\n${state.interviewAnswer}`);
 
   return <Layout><Page>
-    <div className="zero3dHero"><div className="zero3dOrb orb1"/><div className="zero3dOrb orb2"/><Hero eyebrow={APP_VERSION} title={APP_NAME} subtitle="A systematic English-first fast-track mentor to cover Salesforce from basics to job-ready project explanation in less time."><div className="scoreMini"><b>{readiness}%</b><small>Readiness</small><Progress value={readiness}/></div></Hero></div>
+    <div className="zero3dHero"><div className="zero3dOrb orb1"/><div className="zero3dOrb orb2"/><Hero eyebrow={APP_VERSION} title={APP_NAME} subtitle="A systematic English-first fast-track mentor to cover Salesforce from basics to job-ready project explanation in less time."><div className="scoreMini"><b>{readiness}%</b><small>Readiness</small><Progress value={readiness}/></div>
+    <Card title="Learning Plan Structure" subtitle="Page -> Sub-page -> Action. Start from Basics, then move to Build, Interview and Review.">
+      <div className="pageSubpageMap">
+        <a href="#lp-start" className="pageSubpageCard"><b>Page 1: Start & Track</b><small>Sub-pages: Fast Track, Today Board, Micro Lessons</small><p>Use this first every day to know exactly what to learn.</p></a>
+        <a href="#lp-foundation" className="pageSubpageCard"><b>Page 2: Foundation</b><small>Sub-pages: Simple Notes, Roadmap, Diagnostic, Concept Library</small><p>Build basics before advanced topics.</p></a>
+        <a href="#lp-practice" className="pageSubpageCard"><b>Page 3: Practice</b><small>Sub-pages: Scenario Practice, Decision Framework</small><p>Practice like real Salesforce work.</p></a>
+        <a href="#lp-proof" className="pageSubpageCard"><b>Page 4: Proof & Interview</b><small>Sub-pages: Project Proof, Interview Builder, Weekly Checkpoint</small><p>Convert learning into resume and interview proof.</p></a>
+      </div>
+    </Card></Hero></div>
 
-    <div className="zero3dStage"><div className="zero3dCard primary"><span>🎯</span><b>Day {day}</b><small>{phase.name}</small></div><div className="zero3dCard"><span>⚡</span><b>{state.track || 45} Days</b><small>Fast track</small></div><div className="zero3dCard"><span>📘</span><b>{lesson}</b><small>Today lesson</small></div><div className="zero3dCard"><span>✅</span><b>{Object.values(state.done || {}).filter(Boolean).length}</b><small>Completed actions</small></div></div>
+    <div className="zero3dStage"><div className="zero3dCard primary"><span>ðŸŽ¯</span><b>Day {day}</b><small>{phase.name}</small></div><div className="zero3dCard"><span>âš¡</span><b>{state.track || 45} Days</b><small>Fast track</small></div><div className="zero3dCard"><span>ðŸ“˜</span><b>{lesson}</b><small>Today lesson</small></div><div className="zero3dCard"><span>âœ…</span><b>{Object.values(state.done || {}).filter(Boolean).length}</b><small>Completed actions</small></div></div>
 
-    <Card title="Fast Track Setup" subtitle="Choose how quickly you want to cover the complete journey."><div className="easyFlow3d">{tracks.map(track => <button key={track.days} className={Number(state.track) === track.days ? 'easyStep3d done' : 'easyStep3d'} onClick={() => save({ track: track.days, day: Math.min(day, track.days) })}><span>{track.days === 30 ? '🚀' : track.days === 45 ? '⚡' : '🏗️'}</span><b>{track.days}-Day {track.name}</b><p>{track.note}</p><small>{Number(state.track) === track.days ? 'Selected' : 'Select track'}</small></button>)}</div><div className="row"><input type="number" min="1" max={state.track || 60} value={day} onChange={e => save({ day: Number(e.target.value) })}/><button className="btn cyan" onClick={startToday}>Start Today</button><button className="btn ghost" onClick={exportPlan}>Export Plan</button><button className="btn ghost" onClick={() => { writeStore('zeroHeroStart', new Date().toISOString()); save({ day: 1 }); }}>Reset Day 1</button></div></Card>
+    <div id="lp-start" className="anchorPoint"></div><Card title="Fast Track Setup" subtitle="Choose how quickly you want to cover the complete journey."><div className="easyFlow3d">{tracks.map(track => <button key={track.days} className={Number(state.track) === track.days ? 'easyStep3d done' : 'easyStep3d'} onClick={() => save({ track: track.days, day: Math.min(day, track.days) })}><span>{track.days === 30 ? 'ðŸš€' : track.days === 45 ? 'âš¡' : 'ðŸ—ï¸'}</span><b>{track.days}-Day {track.name}</b><p>{track.note}</p><small>{Number(state.track) === track.days ? 'Selected' : 'Select track'}</small></button>)}</div><div className="row"><input type="number" min="1" max={state.track || 60} value={day} onChange={e => save({ day: Number(e.target.value) })}/><button className="btn cyan" onClick={startToday}>Start Today</button><button className="btn ghost" onClick={exportPlan}>Export Plan</button><button className="btn ghost" onClick={() => { writeStore('zeroHeroStart', new Date().toISOString()); save({ day: 1 }); }}>Reset Day 1</button></div></Card>
 
     <Card title="Today Learning Board" subtitle="Only the most useful learning actions. Complete these six actions every day."><div className="easyFlow3d">{dailySystem.map(item => <button key={item.title} className={state.done?.[item.title] ? 'easyStep3d done' : 'easyStep3d'} onClick={() => toggle(item.title)}><span>{item.icon}</span><b>{item.title}</b><p>{item.text}</p><small>{state.done?.[item.title] ? 'Completed' : 'Mark complete'}</small></button>)}</div></Card>
 
     <Card title="Today Micro Lessons" subtitle="Small lessons to finish the current phase quickly."><div className="lessonDeck3d">{lessons.map((item, i) => <button key={item} className={lesson === item ? 'lessonCard3d active' : 'lessonCard3d'} onClick={() => save({ activeLesson: item })}><b>{i + 1}</b><span>{item}</span><small>{phase.name}</small></button>)}</div><textarea value={state.mentorPlan} onChange={e => save({ mentorPlan: e.target.value })} placeholder="Click Start Today to generate the mentor plan."/></Card>
 
-    <Card title="Simple Note Builder" subtitle="Write only five lines. This keeps learning easy and prevents overthinking."><textarea value={state.simpleNote} onChange={e => save({ simpleNote: e.target.value })} placeholder="Topic, meaning, why used, project example, interview line."/></Card>
+    <div id="lp-foundation" className="anchorPoint"></div><Card title="Simple Note Builder" subtitle="Write only five lines. This keeps learning easy and prevents overthinking."><textarea value={state.simpleNote} onChange={e => save({ simpleNote: e.target.value })} placeholder="Topic, meaning, why used, project example, interview line."/></Card>
 
     <Card title="60-Day Systematic Roadmap" subtitle="A clean roadmap without unnecessary sections."><div className="roadmap3d">{phases.map(p => <div key={p.id} className={p.id === phase.id ? 'roadNode3d active' : 'roadNode3d'}><b>{p.days}</b><h3>{p.name}</h3><p>{p.focus}</p><small>{p.outcome}</small></div>)}</div></Card>
 
@@ -127,14 +135,15 @@ export function ZeroToHeroArchitect() {
 
     <Card title="Core Concept Library" subtitle="Only the concepts needed for interviews and real project work."><div className="grid2">{conceptLibrary.map(([title, text]) => <div key={title} className="previewCard"><b>{title}</b><p>{text}</p><button className="btn small ghost" onClick={() => toggle(title)}>{state.done?.[title] ? 'Completed' : 'Mark Complete'}</button></div>)}</div></Card>
 
-    <Card title="Scenario Practice" subtitle="Practice requirement thinking instead of memorizing answers."><select value={state.currentScenario} onChange={e => save({ currentScenario: e.target.value })}>{scenarioPrompts.map(p => <option key={p}>{p}</option>)}</select><textarea value={state.scenarioAnswer} onChange={e => save({ scenarioAnswer: e.target.value })} placeholder="Write: requirement, data model, security, automation/code, testing, deployment, impact."/></Card>
+    <div id="lp-practice" className="anchorPoint"></div><Card title="Scenario Practice" subtitle="Practice requirement thinking instead of memorizing answers."><select value={state.currentScenario} onChange={e => save({ currentScenario: e.target.value })}>{scenarioPrompts.map(p => <option key={p}>{p}</option>)}</select><textarea value={state.scenarioAnswer} onChange={e => save({ scenarioAnswer: e.target.value })} placeholder="Write: requirement, data model, security, automation/code, testing, deployment, impact."/></Card>
 
     <Card title="Architect Decision Framework" subtitle="Use this for every Salesforce feature and every interview scenario."><div className="architectureBox zero3dArchitecture">{architectFramework.map(step => <div key={step}>{step}</div>)}</div><textarea value={state.architectDecision} onChange={e => save({ architectDecision: e.target.value })} placeholder="Explain your decision: Flow vs Apex, data model, security, limits, integration, testing, and deployment."/></Card>
 
-    <Card title="Project Proof Builder" subtitle="Convert every topic into resume and interview proof."><textarea value={state.projectProof} onChange={e => save({ projectProof: e.target.value })} placeholder="Example: Built a Salesforce feature for [business problem] using [Flow/Apex/LWC] with [security/testing] which improved [impact]."/><p className="continueCard">Rule: If you cannot connect a topic to a project, revise it again.</p></Card>
+    <div id="lp-proof" className="anchorPoint"></div><Card title="Project Proof Builder" subtitle="Convert every topic into resume and interview proof."><textarea value={state.projectProof} onChange={e => save({ projectProof: e.target.value })} placeholder="Example: Built a Salesforce feature for [business problem] using [Flow/Apex/LWC] with [security/testing] which improved [impact]."/><p className="continueCard">Rule: If you cannot connect a topic to a project, revise it again.</p></Card>
 
     <Card title="Interview Answer Builder" subtitle="Build answers in three levels: basic, practical, architect."><div className="grid3"><textarea placeholder="Basic: definition"/><textarea placeholder="Practical: scenario + implementation"/><textarea placeholder="Architect: trade-offs + limits + testing + impact"/></div><textarea value={state.interviewAnswer} onChange={e => save({ interviewAnswer: e.target.value })} placeholder="Final 60-second answer."/></Card>
 
     <Card title="Weekly Checkpoint" subtitle="Review progress and decide what to repeat next week."><div className="grid2"><textarea value={state.confidence} onChange={e => save({ confidence: e.target.value })} placeholder="Confidence score, weak topics, blockers, next week plan."/><div className="previewCard"><b>Next Best Actions</b><p>1. Finish today's lesson. 2. Save one project proof. 3. Practice one scenario. 4. Speak one answer. 5. Mark Weak or Strong.</p><div className="row"><Link className="btn cyan" to="/practice">Practice Lab</Link><Link className="btn ghost" to="/ai-mentor">Ask AI Mentor</Link><Link className="btn ghost" to="/final-premium">Final Premium</Link></div></div></div></Card>
   </Page></Layout>;
 }
+
