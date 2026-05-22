@@ -6,8 +6,16 @@ import urllib.parse
 import json
 import urllib.request
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="1.1.0")
+try:
+    from .pro_persistence import register_persistence_routes, SearchRequest
+except Exception:
+    register_persistence_routes = None
+    SearchRequest = None
+
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+if register_persistence_routes:
+    register_persistence_routes(app)
 
 class MentorRequest(BaseModel):
     question: str
@@ -25,7 +33,7 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "mentor-backend", "mode": "local + ollama + search-links", "version": "1.1.0"}
+    return {"ok": True, "service": "mentor-backend", "mode": "local + sqlite + ollama + search-links", "version": "2.1.0"}
 
 @app.get("/api/ollama-status")
 def ollama_status():
@@ -46,19 +54,37 @@ def mentor(req: MentorRequest):
     mode = context.get("mode", "General Mentor")
     difficulty = context.get("difficulty", "2+ Years")
     interview_mode = context.get("interviewMode", "Technical Round")
+    saved_context = ""
+    if SearchRequest and req.mode in ["backend", "rag", "ollama"]:
+        try:
+            for route in app.routes:
+                if getattr(route, "path", "") == "/api/search":
+                    result = route.endpoint(SearchRequest(query=q, limit=6))
+                    saved_context = "\n".join([f"[{r.get('key')}] {r.get('snippet')}" for r in result.get("results", [])])
+                    break
+        except Exception:
+            saved_context = ""
     if req.mode == "ollama":
         try:
-            prompt = f"""You are Abhishek's Salesforce career mentor. Answer in practical Hinglish/English mix when useful.\nMode: {mode}\nDifficulty: {difficulty}\nInterview mode: {interview_mode}\nQuestion: {q}\nGive structured answer with: concept, real scenario, steps, interview answer, follow-up questions, and next action."""
+            prompt = f"""You are Abhishek's 20+ years Salesforce Solution Architect mentor. Use saved app context first, then answer practically in simple English + Hinglish where helpful.
+Mode: {mode}
+Difficulty: {difficulty}
+Interview mode: {interview_mode}
+Saved context:
+{saved_context}
+Question: {q}
+Give: beginner explanation, deep architect view, project use case, interview answer, and next action."""
             payload = json.dumps({"model": "llama3.2", "prompt": prompt, "stream": False}).encode("utf-8")
             request = urllib.request.Request("http://127.0.0.1:11434/api/generate", data=payload, headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(request, timeout=30) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            return {"answer": data.get("response", "Ollama returned no response."), "source": "ollama", "links": []}
+            return {"answer": data.get("response", "Ollama returned no response."), "source": "ollama-rag", "context": saved_context, "links": []}
         except Exception as exc:
-            return {"answer": f"Ollama offline or unavailable: {exc}. Use search links below.", "source": "fallback", "links": search_links(q)}
+            return {"answer": f"Ollama offline or unavailable: {exc}. Use saved context and search links below.\n\n{backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context)}", "source": "fallback", "context": saved_context, "links": search_links(q)}
     return {
-        "answer": backend_mentor_answer(q, mode, difficulty, interview_mode),
-        "source": "fastapi-mentor",
+        "answer": backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context),
+        "source": "fastapi-sqlite-mentor" if saved_context else "fastapi-mentor",
+        "context": saved_context,
         "links": search_links(q),
     }
 
@@ -86,8 +112,18 @@ def api_search_links(q: str):
 
 @app.get("/api/dashboard-summary")
 def dashboard_summary():
+    analytics = {"job_ready_score": 0, "items": 0}
+    try:
+        for route in app.routes:
+            if getattr(route, "path", "") == "/api/analytics":
+                analytics = route.endpoint()
+                break
+    except Exception:
+        pass
     return {
         "status": "ready",
+        "job_ready_score": analytics.get("job_ready_score", 0),
+        "items": analytics.get("items", 0),
         "next_actions": [
             "Complete one 45-minute Salesforce sprint",
             "Save one interview answer",
@@ -96,16 +132,18 @@ def dashboard_summary():
         ]
     }
 
-def backend_mentor_answer(q: str, mode: str, difficulty: str, interview_mode: str) -> str:
+def backend_mentor_answer(q: str, mode: str, difficulty: str, interview_mode: str, saved_context: str = "") -> str:
+    context_line = f"\nSaved app context found:\n{saved_context}\n" if saved_context else "\nNo saved context found yet. Save notes/answers/jobs first for RAG guidance.\n"
     return (
         f"Backend mentor answer for: {q}\n\n"
-        f"Mode: {mode}\nDifficulty: {difficulty}\nInterview Round: {interview_mode}\n\n"
+        f"Mode: {mode}\nDifficulty: {difficulty}\nInterview Round: {interview_mode}\n"
+        f"{context_line}\n"
         "1. Concept: define it in simple words.\n"
-        "2. Real scenario: connect it to CRM/business use case.\n"
-        "3. Implementation: mention configuration/code/data/security/testing.\n"
-        "4. Interview answer: keep it clear, structured, and impact-focused.\n"
-        "5. Follow-up: prepare edge cases, limitations, and alternatives.\n"
-        "6. Next action: save this answer, mark Weak/Strong, and revise it in weekly test."
+        "2. Beginner view: explain like you are starting from zero.\n"
+        "3. Real scenario: connect it to CRM/business use case.\n"
+        "4. Architect view: data model, security, limits, trade-offs, integration and deployment.\n"
+        "5. Interview answer: use STAR + technical depth + measurable impact.\n"
+        "6. Next action: save answer, create project proof, mark Weak/Strong, revise in weekly test."
     )
 
 def search_links(q: str):
