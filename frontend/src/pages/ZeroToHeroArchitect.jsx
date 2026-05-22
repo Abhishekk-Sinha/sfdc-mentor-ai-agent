@@ -13,89 +13,59 @@ const phases = [
 ];
 
 const architectPrinciples = [
-  'Always start with business process before tool or code.',
-  'Prefer configuration first, code only when configuration cannot solve cleanly.',
-  'Design security from day one: object, field, record, sharing, integration access.',
-  'Think limits: governor limits, data volume, API limits, async processing, ownership skew.',
-  'Every solution needs error handling, auditability, rollback and monitoring.',
-  'Make reusable patterns: trigger framework, service layer, selectors, reusable LWC, common flows.',
-  'Explain trade-offs: Flow vs Apex, sync vs async, lookup vs master-detail, platform event vs callout.',
-  'Convert every project into measurable business impact.'
+  'Always start with business process before tool or code.', 'Prefer configuration first, code only when configuration cannot solve cleanly.', 'Design security from day one: object, field, record, sharing, integration access.', 'Think limits: governor limits, data volume, API limits, async processing, ownership skew.', 'Every solution needs error handling, auditability, rollback and monitoring.', 'Make reusable patterns: trigger framework, service layer, selectors, reusable LWC, common flows.', 'Explain trade-offs: Flow vs Apex, sync vs async, lookup vs master-detail, platform event vs callout.', 'Convert every project into measurable business impact.'
 ];
 
-const simulatorFeatures = [
-  'Zero Knowledge Diagnostic Test','Personal Mentor Interview Mode','Daily Explain to Me Oral Practice','Topic Unlock System','Beginner Mistake Warning System','Salesforce Vocabulary Builder','Concept-to-Project Mapping','Admin vs Developer Decision Coach','Flow vs Apex Decision Simulator','Real Production Bug Simulator','Client Requirement to Solution Builder','BRD to Salesforce Design Practice','Data Model Designer Practice','Security Model Simulator','Governor Limit Trainer','Apex Debug Log Reader','LWC Error Fixing Lab','SOQL Query Builder Trainer','Integration API Practice Room','Deployment War Room','Release Notes Learning Tracker','Daily Salesforce News Learning','Architect Trade-off Practice','Mock Client Call Practice','Solution Design Review Checklist','Requirement Clarification Question Bank','Project Documentation Generator','Interview Confidence Tracker','English Speaking for Salesforce Interviews','Final Job Simulation Week'
-];
-
+const simulatorFeatures = ['Zero Knowledge Diagnostic Test','Personal Mentor Interview Mode','Daily Explain to Me Oral Practice','Topic Unlock System','Beginner Mistake Warning System','Salesforce Vocabulary Builder','Concept-to-Project Mapping','Admin vs Developer Decision Coach','Flow vs Apex Decision Simulator','Real Production Bug Simulator','Client Requirement to Solution Builder','BRD to Salesforce Design Practice','Data Model Designer Practice','Security Model Simulator','Governor Limit Trainer','Apex Debug Log Reader','LWC Error Fixing Lab','SOQL Query Builder Trainer','Integration API Practice Room','Deployment War Room','Release Notes Learning Tracker','Daily Salesforce News Learning','Architect Trade-off Practice','Mock Client Call Practice','Solution Design Review Checklist','Requirement Clarification Question Bank','Project Documentation Generator','Interview Confidence Tracker','English Speaking for Salesforce Interviews','Final Job Simulation Week'];
 const diagnosticQuestions = ['What is CRM?','Difference between object and field?','What is profile vs permission set?','When to use Flow?','What is Apex trigger?','What is SOQL?','What is LWC?','What is integration?','What is deployment?','How do you explain a project?'];
 const vocabulary = ['Lead','Account','Contact','Opportunity','Case','Object','Field','Record Type','Profile','Permission Set','OWD','Role Hierarchy','Sharing Rule','Flow','Apex','Trigger','LWC','SOQL','REST API','Named Credential'];
-const basics = [
-  ['CRM', 'Customer data, sales/service process, lifecycle, leads, accounts, contacts, opportunities.'],
-  ['Data Model', 'Objects, fields, relationships, record types, schema builder, normalized data.'],
-  ['Security', 'Profiles, permission sets, OWD, role hierarchy, sharing rules, FLS.'],
-  ['Automation', 'Flow, approval process, validation rule, formula, assignment rules.'],
-  ['Apex', 'Class, trigger, SOQL, DML, test class, governor limits, bulk design.'],
-  ['LWC', 'Components, props, events, lifecycle, wire, Apex calls, UI API.'],
-  ['Integration', 'REST API, auth, named credentials, JSON, callouts, async handling.'],
-  ['Deployment', 'Change sets/Gearset, metadata, tests, sandbox, release checklist.']
+const basics = [ ['CRM', 'Customer data, sales/service process, lifecycle, leads, accounts, contacts, opportunities.'], ['Data Model', 'Objects, fields, relationships, record types, schema builder, normalized data.'], ['Security', 'Profiles, permission sets, OWD, role hierarchy, sharing rules, FLS.'], ['Automation', 'Flow, approval process, validation rule, formula, assignment rules.'], ['Apex', 'Class, trigger, SOQL, DML, test class, governor limits, bulk design.'], ['LWC', 'Components, props, events, lifecycle, wire, Apex calls, UI API.'], ['Integration', 'REST API, auth, named credentials, JSON, callouts, async handling.'], ['Deployment', 'Change sets/Gearset, metadata, tests, sandbox, release checklist.'] ];
+const dailyQuestions = ['What did I learn today in simple English?','Can I explain this in Hinglish to a beginner?','Where is this used in a real Salesforce project?','What can go wrong in production?','How will I test it?','How will I explain it in interview in 60 seconds?','What is my weak point from today?','What proof did I create today?'];
+const systemDesignPrompts = ['Design a Doctor Patient Management System in Salesforce.','Design a lead assignment and follow-up automation system.','Design an external payment/status integration with Salesforce.','Design a scalable case management process for service agents.','Design an AI assistant that searches saved learning data and web fallback.','Design a secure portal for customers using Experience Cloud.'];
+const easySteps = [
+  { icon:'👂', title:'1. Suno / Read', text:'Pehle concept ko simple language mein read karo. Goal sirf samajhna hai, yaad karna nahi.' },
+  { icon:'✍️', title:'2. Simple Note', text:'Apne words mein 5 lines likho: what, why, where, example, interview line.' },
+  { icon:'🧪', title:'3. Practice', text:'1 easy question, 1 scenario, 1 debugging/practical question solve karo.' },
+  { icon:'🎤', title:'4. Explain', text:'60-second interview answer bolo: definition + project example + impact.' },
+  { icon:'🏗️', title:'5. Project Proof', text:'Har topic ko project proof mein convert karo. Ye resume/interview mein kaam aayega.' }
 ];
-
-const dailyQuestions = [
-  'What did I learn today in simple English?',
-  'Can I explain this in Hinglish to a beginner?',
-  'Where is this used in a real Salesforce project?',
-  'What can go wrong in production?',
-  'How will I test it?',
-  'How will I explain it in interview in 60 seconds?',
-  'What is my weak point from today?',
-  'What proof did I create today?'
-];
-
-const systemDesignPrompts = [
-  'Design a Doctor Patient Management System in Salesforce.',
-  'Design a lead assignment and follow-up automation system.',
-  'Design an external payment/status integration with Salesforce.',
-  'Design a scalable case management process for service agents.',
-  'Design an AI assistant that searches saved learning data and web fallback.',
-  'Design a secure portal for customers using Experience Cloud.'
-];
+const microLessons = {
+  Foundation:['CRM kya hota hai?','Object vs Record vs Field','Lookup vs Master-Detail','Page Layout vs Lightning Record Page','Validation Rule basics'],
+  'Admin Core':['Profile vs Permission Set','OWD and Sharing Rules','Flow before Apex decision','Approval Process','Reports and Dashboards'],
+  'Developer Core':['Apex class basics','SOQL query basics','Trigger lifecycle','Bulkification','Test class pattern'],
+  'LWC + Integration':['LWC component anatomy','Parent child communication','Wire vs imperative Apex','REST API basics','Named Credential'],
+  'Project + Interview':['Project story in STAR','Production issue explanation','Deployment checklist','Mock interview answer','Resume bullet proof'],
+  'Architect Upgrade':['Data model trade-off','Security architecture','Sync vs Async','Integration pattern','Scalability and limits']
+};
 
 function todayDay(){ const start = readStore('zeroHeroStart', new Date().toISOString()); const diff = Math.floor((Date.now() - new Date(start).getTime())/86400000)+1; return Math.max(1, Math.min(120, diff)); }
 function phaseForDay(day){ return phases.find(p => { const [a,b]=p.days.split('-').map(Number); return day>=a && day<=b; }) || phases[0]; }
-function score(s){
-  const tasks = Object.values(s.done||{}).filter(Boolean).length;
-  const proof = (s.dailyProof||'').length > 40 ? 10 : 0;
-  const teach = (s.teachBack||'').length > 40 ? 10 : 0;
-  const project = (s.projectProof||'').length > 60 ? 10 : 0;
-  const diagnostic = Object.values(s.diagnostic||{}).filter(Boolean).length * 3;
-  return Math.min(100, Math.round(tasks*2 + proof + teach + project + diagnostic));
-}
-function autoMentor(state){
-  const d = todayDay(); const phase = phaseForDay(d); const weak = Object.entries(readStore('weakStrong',{})).filter(([,v])=>v==='Weak').map(([k])=>k)[0] || phase.focus.split(',')[0];
-  return `Day ${d} Mentor Guidance\n\nPhase: ${phase.name}\nFocus: ${phase.focus}\n\nToday's deep work:\n1. Learn one concept: ${weak}\n2. Create one simple note in Hinglish\n3. Solve 5 practice questions\n4. Write one 60-second interview answer\n5. Add one project proof line\n\nArchitect thinking:\n- Requirement kya hai?\n- Data model kya hoga?\n- Security impact kya hai?\n- Flow vs Apex decision kya hai?\n- Testing and deployment kaise hoga?`;
-}
+function score(s){ const tasks = Object.values(s.done||{}).filter(Boolean).length; const proof = (s.dailyProof||'').length > 40 ? 10 : 0; const teach = (s.teachBack||'').length > 40 ? 10 : 0; const project = (s.projectProof||'').length > 60 ? 10 : 0; const diagnostic = Object.values(s.diagnostic||{}).filter(Boolean).length * 3; return Math.min(100, Math.round(tasks*2 + proof + teach + project + diagnostic)); }
+function autoMentor(state){ const d = todayDay(); const phase = phaseForDay(d); const weak = Object.entries(readStore('weakStrong',{})).filter(([,v])=>v==='Weak').map(([k])=>k)[0] || phase.focus.split(',')[0]; return `Day ${d} Mentor Guidance\n\nPhase: ${phase.name}\nFocus: ${phase.focus}\n\nAaj ka easy learning flow:\n1. 20 min: Concept samjho - ${weak}\n2. 15 min: Simple note banao Hinglish mein\n3. 30 min: 3 practice questions karo\n4. 15 min: Interview answer bolo\n5. 10 min: Project proof likho\n\nArchitect thinking:\n- Requirement kya hai?\n- Data model kya hoga?\n- Security impact kya hai?\n- Flow vs Apex decision kya hai?\n- Testing and deployment kaise hoga?`; }
 
 export function ZeroToHeroArchitect(){
-  const [state,setState]=React.useState(()=>readStore('zeroHeroArchitect',{day:todayDay(),dailyProof:'',teachBack:'',projectProof:'',questionAnswer:'',mentorNote:'',done:{},diagnostic:{},architectDecision:'',systemDesign:'',clientRequirement:'',brd:'',dataModel:'',securityModel:'',soql:'SELECT Id, Name FROM Account LIMIT 10',apiRoom:'',debugLog:'',lwcError:'',confidence:'',englishPractice:'',releaseNotes:''}));
+  const [state,setState]=React.useState(()=>readStore('zeroHeroArchitect',{day:todayDay(),dailyProof:'',teachBack:'',projectProof:'',questionAnswer:'',mentorNote:'',done:{},diagnostic:{},architectDecision:'',systemDesign:'',clientRequirement:'',brd:'',dataModel:'',securityModel:'',soql:'SELECT Id, Name FROM Account LIMIT 10',apiRoom:'',debugLog:'',lwcError:'',confidence:'',englishPractice:'',releaseNotes:'',simpleNote:'',activeLesson:''}));
   const save=p=>{const n={...state,...p}; setState(n); writeStore('zeroHeroArchitect',n);};
-  const day = state.day || todayDay(); const phase = phaseForDay(day); const pct = score(state);
-  const toggle=x=>save({done:{...state.done,[x]:!state.done?.[x]}});
-  const toggleDiag=x=>save({diagnostic:{...state.diagnostic,[x]:!state.diagnostic?.[x]}});
+  const day = state.day || todayDay(); const phase = phaseForDay(day); const pct = score(state); const lessons = microLessons[phase.name] || microLessons.Foundation;
+  const toggle=x=>save({done:{...state.done,[x]:!state.done?.[x]}}); const toggleDiag=x=>save({diagnostic:{...state.diagnostic,[x]:!state.diagnostic?.[x]}});
   const generate=()=>save({mentorNote:autoMentor(state)});
+  const startEasyMode=()=>save({activeLesson: lessons[(day-1)%lessons.length], mentorNote:autoMentor(state), simpleNote:`Topic: ${lessons[(day-1)%lessons.length]}\n\nWhat: \nWhy: \nReal project example: \nInterview line: \nMistake to avoid: `});
   const exportPlan=()=>downloadText('zero-to-hero-architect-plan.txt',`Day ${day}\nPhase: ${phase.name}\nScore: ${pct}%\n\nMentor Note:\n${state.mentorNote}\n\nDaily Proof:\n${state.dailyProof}\n\nTeach Back:\n${state.teachBack}\n\nProject Proof:\n${state.projectProof}`);
 
   return <Layout><Page>
-    <Hero title="Zero to Hero Salesforce Architect Mentor" subtitle="20+ years Solution Architect style guidance: basics, depth, project thinking, client simulation, production bugs and final job simulation.">
-      <div className="scoreMini"><b>{pct}%</b><small>Today Readiness</small><Progress value={pct}/></div>
-    </Hero>
+    <div className="zero3dHero"><div className="zero3dOrb orb1"/><div className="zero3dOrb orb2"/><Hero title="Zero to Hero Salesforce Architect Mentor" subtitle="Easy step-by-step learning + 20+ years Solution Architect guidance + 3D premium experience."><div className="scoreMini"><b>{pct}%</b><small>Today Readiness</small><Progress value={pct}/></div></Hero></div>
 
-    <div className="statsGrid"><div className="stat"><span>🎯</span><p>Today Day</p><b>Day {day}</b><small>{phase.name}</small></div><div className="stat"><span>🏗️</span><p>Architect Phase</p><b>{phase.id}/6</b><small>{phase.days}</small></div><div className="stat"><span>✅</span><p>Tasks Done</p><b>{Object.values(state.done||{}).filter(Boolean).length}</b><small>daily proof</small></div><div className="stat"><span>🧠</span><p>Diagnostic</p><b>{Object.values(state.diagnostic||{}).filter(Boolean).length}/10</b><small>basic check</small></div></div>
+    <div className="zero3dStage"><div className="zero3dCard primary"><span>🎯</span><b>Day {day}</b><small>{phase.name}</small></div><div className="zero3dCard"><span>🏗️</span><b>Phase {phase.id}/6</b><small>{phase.days}</small></div><div className="zero3dCard"><span>✅</span><b>{Object.values(state.done||{}).filter(Boolean).length}</b><small>Tasks Done</small></div><div className="zero3dCard"><span>🧠</span><b>{Object.values(state.diagnostic||{}).filter(Boolean).length}/10</b><small>Diagnostic</small></div></div>
 
-    <Card title="Mentor Automation" subtitle="Generate today's guidance from your current phase and weak topics."><div className="row"><input type="number" min="1" max="120" value={day} onChange={e=>save({day:Number(e.target.value)})}/><button className="btn cyan" onClick={generate}>Generate Mentor Guidance</button><button className="btn ghost" onClick={exportPlan}>Export Plan</button><button className="btn ghost" onClick={()=>writeStore('zeroHeroStart',new Date().toISOString())}>Reset Day 1</button></div><textarea value={state.mentorNote} onChange={e=>save({mentorNote:e.target.value})} placeholder="Click Generate Mentor Guidance"/></Card>
+    <Card title="Easy Learn Mode - Start Here" subtitle="Confusion kam, learning easy. Bas step-by-step follow karo."><div className="easyFlow3d">{easySteps.map((s,i)=><button key={s.title} onClick={()=>toggle(s.title)} className={state.done?.[s.title]?'easyStep3d done':'easyStep3d'}><span>{s.icon}</span><b>{s.title}</b><p>{s.text}</p><small>{state.done?.[s.title]?'Completed':'Click after done'}</small></button>)}</div><div className="row"><button className="btn cyan" onClick={startEasyMode}>Start Today's Easy Mode</button><button className="btn ghost" onClick={generate}>Generate Mentor Guidance</button><button className="btn ghost" onClick={exportPlan}>Export Plan</button><button className="btn ghost" onClick={()=>writeStore('zeroHeroStart',new Date().toISOString())}>Reset Day 1</button></div></Card>
+
+    <Card title="Today's Micro Lesson" subtitle="Small lesson, simple notes, interview line."><div className="lessonDeck3d">{lessons.map((l,i)=><button key={l} onClick={()=>save({activeLesson:l})} className={state.activeLesson===l?'lessonCard3d active':'lessonCard3d'}><b>{i+1}</b><span>{l}</span><small>{phase.name}</small></button>)}</div><textarea value={state.simpleNote} onChange={e=>save({simpleNote:e.target.value})} placeholder="Click Start Today's Easy Mode or write simple note: What, Why, Example, Interview Line, Mistake."/></Card>
+
+    <Card title="Mentor Automation" subtitle="Generate today's guidance from your current phase and weak topics."><div className="row"><input type="number" min="1" max="120" value={day} onChange={e=>save({day:Number(e.target.value)})}/></div><textarea value={state.mentorNote} onChange={e=>save({mentorNote:e.target.value})} placeholder="Click Generate Mentor Guidance"/></Card>
 
     <Card title="Zero Knowledge Diagnostic Test"><div className="grid2">{diagnosticQuestions.map(q=><label className="previewCard" key={q}><input type="checkbox" checked={!!state.diagnostic?.[q]} onChange={()=>toggleDiag(q)}/><b>{q}</b><small>{state.diagnostic?.[q]?'I know this':'Need to learn'}</small></label>)}</div></Card>
 
-    <Card title="120-Day Beginner to Architect Roadmap"><div className="timeline premiumTimeline">{phases.map(p=><div className={p.id===phase.id?'timelineCard taskDone':'timelineCard'} key={p.id}><b>{p.days}</b><h3>{p.name}</h3><p>{p.focus}</p><small>{p.outcome}</small></div>)}</div></Card>
+    <Card title="120-Day Beginner to Architect Roadmap"><div className="roadmap3d">{phases.map(p=><div className={p.id===phase.id?'roadNode3d active':'roadNode3d'} key={p.id}><b>{p.days}</b><h3>{p.name}</h3><p>{p.focus}</p><small>{p.outcome}</small></div>)}</div></Card>
 
     <Card title="Absolute Basics Foundation"><div className="grid2">{basics.map(([t,d])=><div className="previewCard" key={t}><b>{t}</b><p>{d}</p><button className="btn small ghost" onClick={()=>toggle(t)}>{state.done?.[t]?'Done':'Mark Done'}</button></div>)}</div></Card>
 
@@ -103,7 +73,7 @@ export function ZeroToHeroArchitect(){
 
     <Card title="Client Requirement to Solution Builder + BRD Practice"><div className="grid2"><textarea value={state.clientRequirement} onChange={e=>save({clientRequirement:e.target.value})} placeholder="Client says: We need to track patient appointments / leads / follow-ups..."/><textarea value={state.brd} onChange={e=>save({brd:e.target.value})} placeholder="BRD: problem, users, data, automation, reports, security, acceptance criteria"/></div></Card>
 
-    <Card title="Architect Decision Framework" subtitle="Use this for every Salesforce feature."><div className="architectureBox"><div>Business Requirement</div><div>Data Model</div><div>Security</div><div>Automation</div><div>Code</div><div>Integration</div><div>Testing</div><div>Deployment</div></div><textarea value={state.architectDecision} onChange={e=>save({architectDecision:e.target.value})} placeholder="Write decision: Flow vs Apex, sync vs async, object model, security, limits, testing."/></Card>
+    <Card title="Architect Decision Framework" subtitle="Use this for every Salesforce feature."><div className="architectureBox zero3dArchitecture"><div>Business Requirement</div><div>Data Model</div><div>Security</div><div>Automation</div><div>Code</div><div>Integration</div><div>Testing</div><div>Deployment</div></div><textarea value={state.architectDecision} onChange={e=>save({architectDecision:e.target.value})} placeholder="Write decision: Flow vs Apex, sync vs async, object model, security, limits, testing."/></Card>
 
     <Card title="Admin vs Developer + Flow vs Apex Decision Simulator"><div className="grid2"><div className="previewCard"><b>Use Admin/Flow when</b><p>Simple automation, low complexity, admin maintainable, no complex transaction logic.</p></div><div className="previewCard"><b>Use Apex when</b><p>Complex logic, bulk processing, integration orchestration, custom error handling, reusable services.</p></div></div><textarea placeholder="Requirement: decide Admin, Flow, Apex or LWC and explain trade-off." onBlur={e=>writeStore('flowApexDecision',e.target.value)}/></Card>
 
