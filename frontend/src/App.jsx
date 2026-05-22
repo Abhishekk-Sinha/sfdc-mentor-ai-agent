@@ -10,6 +10,7 @@ import { InterviewQA, ProjectsPage, WeeklyTests } from './pages/TestsInterview';
 import { JDMatcher, JobTracker, MoreTools } from './pages/JobsTools';
 import { Backup, Documents, Doubts, Journal, Notes, TimeTracker } from './pages/Productivity';
 import { Certifications, ResumeOptimizer } from './pages/ResumeCert';
+import { PremiumFeatures } from './pages/PremiumFeatures';
 
 function Protected({ children }) {
   const session = readStore('session', null);
@@ -18,6 +19,7 @@ function Protected({ children }) {
 }
 
 export default function App() {
+  const home = readStore('session', null) ? '/dashboard' : '/portfolio';
   return <BrowserRouter><Routes>
     <Route path="/login" element={<Login/>}/>
     <Route path="/portfolio" element={<Portfolio/>}/>
@@ -43,8 +45,9 @@ export default function App() {
     <Route path="/journal" element={<Protected><Journal/></Protected>}/>
     <Route path="/certifications" element={<Protected><Certifications/></Protected>}/>
     <Route path="/portfolio-manager" element={<Protected><PortfolioManager/></Protected>}/>
+    <Route path="/premium-features" element={<Protected><PremiumFeatures/></Protected>}/>
     <Route path="/more-tools" element={<Protected><MoreTools/></Protected>}/>
     <Route path="/backup" element={<Protected><Backup/></Protected>}/>
-    <Route path="*" element={<Navigate to={readStore('session', null) ? '/dashboard' : '/portfolio'} replace/>}/>
+    <Route path="*" element={<Navigate to={home} replace/>}/>
   </Routes></BrowserRouter>;
 }
