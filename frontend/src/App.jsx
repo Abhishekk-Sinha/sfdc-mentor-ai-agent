@@ -1,7 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { readStore } from './utils/storage';
-import { Login, Portfolio, PortfolioManager } from './pages/AuthPortfolio';
+import { Login, PortfolioManager } from './pages/AuthPortfolio';
+import { PremiumPortfolio } from './pages/PremiumPortfolio';
 import { Dashboard } from './pages/Dashboard';
 import { AIMentor, FocusMode, LearningCoach, MentorRoute } from './pages/Mentor';
 import { English100 } from './pages/English';
@@ -26,7 +27,7 @@ export default function App() {
   const home = readStore('session', null) ? '/dashboard' : '/portfolio';
   return <BrowserRouter><Routes>
     <Route path="/login" element={<Login/>}/>
-    <Route path="/portfolio" element={<Portfolio/>}/>
+    <Route path="/portfolio" element={<PremiumPortfolio/>}/>
     <Route path="/dashboard" element={<Protected><Dashboard/></Protected>}/>
     <Route path="/ai-mentor" element={<Protected><AIMentor/></Protected>}/>
     <Route path="/mentor-route" element={<Protected><MentorRoute/></Protected>}/>
