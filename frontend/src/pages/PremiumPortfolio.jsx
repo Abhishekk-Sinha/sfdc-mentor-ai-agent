@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { cvSkills, experience, profile, projects } from '../data/profile';
 import { readStore } from '../utils/storage';
+import '../premium-portfolio.css';
 
 const defaultPhoto = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420">
