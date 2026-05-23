@@ -53,6 +53,21 @@ function useDashboardData() {
   return { activeDay, today, score, savedAnswers, strong, weak, applied, completedTasks, totalTasks, routeDoneToday, weeklyResults };
 }
 
+function MomentumGraph({ score, savedAnswers, strong, applied }) {
+  const values = [25, Math.min(100, 25 + savedAnswers * 4), Math.min(100, 35 + strong * 8), Math.min(100, 45 + applied * 6), score];
+  const points = values.map((value, index) => `${20 + index * 55},${120 - value}`).join(' ');
+  return <div className="momentumGraphCard">
+    <div className="momentumGraphHead"><div><b>Learning Momentum</b><span>Real progress trend</span></div><strong>{score}%</strong></div>
+    <svg viewBox="0 0 260 135" role="img" aria-label="Learning momentum graph">
+      <defs><linearGradient id="momentumLine" x1="0" x2="1"><stop offset="0%" stopColor="#35d4ef"/><stop offset="55%" stopColor="#22c55e"/><stop offset="100%" stopColor="#7c3aed"/></linearGradient></defs>
+      <path d="M20 25 H240 M20 55 H240 M20 85 H240 M20 115 H240" className="graphGrid"/>
+      <polyline points={points} className="graphLine"/>
+      {values.map((value, index) => <circle key={index} cx={20 + index * 55} cy={120 - value} r="5.5" className="graphDot"/>)}
+    </svg>
+    <div className="momentumLegend"><span>Start</span><span>Answers</span><span>Strong</span><span>Jobs</span><span>Ready</span></div>
+  </div>;
+}
+
 function DashboardHero({ score, activeDay, savedAnswers, strong, applied }) {
   const heroStats = [
     { label: 'Day', value: `Day ${activeDay}` },
@@ -71,6 +86,7 @@ function DashboardHero({ score, activeDay, savedAnswers, strong, applied }) {
     </div>
     <div className="dashboardScorePanel">
       <div className="scoreCircle"><b>{score}%</b><span>Job Ready</span></div>
+      <MomentumGraph score={score} savedAnswers={savedAnswers} strong={strong} applied={applied} />
       <div className="heroMiniStats">{heroStats.map(item => <div key={item.label}><b>{item.value}</b><span>{item.label}</span></div>)}</div>
     </div>
   </section>;
