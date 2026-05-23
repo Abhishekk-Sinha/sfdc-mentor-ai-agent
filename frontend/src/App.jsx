@@ -7,7 +7,8 @@ import { Dashboard } from './pages/Dashboard';
 import { AIMentor, FocusMode, LearningCoach, MentorRoute } from './pages/Mentor';
 import { English100 } from './pages/English';
 import { PracticeLab, ScenarioQuestions, UseCases } from './pages/Practice';
-import { InterviewQA, ProjectsPage, WeeklyTests } from './pages/TestsInterview';
+import { ProjectsPage, WeeklyTests } from './pages/TestsInterview';
+import { InterviewRoomPro } from './pages/InterviewRoomPro';
 import { JDMatcher, JobTracker, MoreTools } from './pages/JobsTools';
 import { Backup, Documents, Doubts, Journal, Notes, TimeTracker } from './pages/Productivity';
 import { Certifications, ResumeOptimizer } from './pages/ResumeCert';
@@ -39,7 +40,7 @@ export default function App() {
     <Route path="/scenarios" element={<Protected><ScenarioQuestions/></Protected>}/>
     <Route path="/use-cases" element={<Protected><UseCases/></Protected>}/>
     <Route path="/weekly-tests" element={<Protected><WeeklyTests/></Protected>}/>
-    <Route path="/interview" element={<Protected><InterviewQA/></Protected>}/>
+    <Route path="/interview" element={<Protected><InterviewRoomPro/></Protected>}/>
     <Route path="/projects" element={<Protected><ProjectsPage/></Protected>}/>
     <Route path="/job-tracker" element={<Protected><JobTracker/></Protected>}/>
     <Route path="/jd-matcher" element={<Protected><JDMatcher/></Protected>}/>
