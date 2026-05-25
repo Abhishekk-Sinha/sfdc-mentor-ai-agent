@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { CareerWatch } from './CareerWatch';
 import {
   FLOATING_ACTIONS,
   LOCAL_SEARCH_ROUTES,
@@ -173,6 +174,52 @@ function FloatingActions() {
   return <div className="fabWrap">{open && <div className="fabMenu">{FLOATING_ACTIONS.map(action => <Link key={action.to} to={action.to} onClick={() => setOpen(false)}><span>{action.icon}</span>{action.label}</Link>)}</div>}<button className="fab" onClick={() => setOpen(!open)}>{open ? '×' : '+'}</button></div>;
 }
 
+function DraggableCareerWatch() {
+  const [visible, setVisible] = React.useState(() => localStorage.getItem('careerWatchHidden') !== 'true');
+  const [minimized, setMinimized] = React.useState(() => localStorage.getItem('careerWatchMinimized') === 'true');
+  const [position, setPosition] = React.useState(() => safeJson(localStorage.getItem('careerWatchPosition') || '{"x":24,"y":120}'));
+  const dragRef = React.useRef(null);
+
+  React.useEffect(() => { localStorage.setItem('careerWatchHidden', String(!visible)); }, [visible]);
+  React.useEffect(() => { localStorage.setItem('careerWatchMinimized', String(minimized)); }, [minimized]);
+  React.useEffect(() => { localStorage.setItem('careerWatchPosition', JSON.stringify(position)); }, [position]);
+
+  function startDrag(event) {
+    const point = event.touches?.[0] || event;
+    dragRef.current = { startX: point.clientX, startY: point.clientY, baseX: position.x, baseY: position.y };
+    window.addEventListener('mousemove', onDrag);
+    window.addEventListener('mouseup', stopDrag);
+    window.addEventListener('touchmove', onDrag, { passive: false });
+    window.addEventListener('touchend', stopDrag);
+  }
+
+  function onDrag(event) {
+    if (!dragRef.current) return;
+    event.preventDefault?.();
+    const point = event.touches?.[0] || event;
+    const nextX = Math.max(8, Math.min(window.innerWidth - 330, dragRef.current.baseX + point.clientX - dragRef.current.startX));
+    const nextY = Math.max(72, Math.min(window.innerHeight - 170, dragRef.current.baseY + point.clientY - dragRef.current.startY));
+    setPosition({ x: nextX, y: nextY });
+  }
+
+  function stopDrag() {
+    dragRef.current = null;
+    window.removeEventListener('mousemove', onDrag);
+    window.removeEventListener('mouseup', stopDrag);
+    window.removeEventListener('touchmove', onDrag);
+    window.removeEventListener('touchend', stopDrag);
+  }
+
+  if (!visible) return <button className="careerWatchShowBtn" onClick={() => setVisible(true)}>⏱️ Career Watch</button>;
+  return <div className={minimized ? 'floatingCareerWatch minimized' : 'floatingCareerWatch'} style={{ left: position.x, top: position.y }}>
+    <div className="floatingWatchHandle" onMouseDown={startDrag} onTouchStart={startDrag}>
+      <span>⠿ Career Watch</span>
+      <div><button onClick={() => setMinimized(!minimized)}>{minimized ? 'Open' : 'Min'}</button><button onClick={() => setVisible(false)}>Hide</button></div>
+    </div>
+    {!minimized && <CareerWatch compact />}
+  </div>;
+}
+
 function MobileBottomNav() {
   const location = useLocation();
   return <nav className="mobileBottomNav">{MOBILE_NAV_ITEMS.map(item => <Link key={item.to} className={location.pathname === item.to ? 'active' : ''} to={item.to}><span>{item.icon}</span><small>{item.label}</small></Link>)}</nav>;
@@ -203,7 +250,7 @@ function Topbar() {
 
 export function Layout({ children }) {
   React.useEffect(() => { runSilentCareerAutomation(); }, []);
-  return <div className="appShell"><Sidebar/><main className="main"><Topbar/>{children}<ToastCenter/><FloatingActions/><MobileBottomNav/></main></div>;
+  return <div className="appShell"><Sidebar/><main className="main"><Topbar/>{children}<ToastCenter/><DraggableCareerWatch/><FloatingActions/><MobileBottomNav/></main></div>;
 }
 
 export function Page({ children }) { return <div className="page">{children}</div>; }
