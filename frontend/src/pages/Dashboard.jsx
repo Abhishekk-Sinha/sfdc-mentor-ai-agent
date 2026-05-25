@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { companies } from '../data/companies';
 import { roadmap90 } from '../data/roadmap';
 import { Layout, Page, Card, Stat, Progress } from '../components/UI';
-import { CareerWatch } from '../components/CareerWatch';
 import { readStore } from '../utils/storage';
 import { DASHBOARD_HERO_ACTIONS, PREMIUM_PATH_STEPS, QUICK_START_CARDS, TOOL_GROUPS } from '../config/dashboardConfig';
 
@@ -99,17 +98,6 @@ function PremiumCommandStrip() {
   </div>;
 }
 
-function DashboardCareerWatchStrip() {
-  return <section className="dashboardCareerWatchStrip">
-    <div>
-      <p className="eyebrow">Private Career OS Tool</p>
-      <h2>Career Watch</h2>
-      <p>Use this inside the logged-in app for focused study sprints. It is removed from the public portfolio.</p>
-    </div>
-    <CareerWatch compact />
-  </section>;
-}
-
 function QuickStartCard() {
   return <Card title="Quick Start" subtitle="Open the right page fast.">
     <div className="quickStartStack">
@@ -159,7 +147,6 @@ export function Dashboard() {
   return <Layout><Page>
     <DashboardHero {...data} />
     <PremiumCommandStrip />
-    <DashboardCareerWatchStrip />
     <PremiumHomeGrid {...data} />
     <DashboardStats {...data} />
     <DashboardDeepGrid {...data} />
