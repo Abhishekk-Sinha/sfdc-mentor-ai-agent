@@ -39,29 +39,6 @@ const recruiterBullets = [
   'Interview-ready portfolio with measurable business impact and practical project explanations.',
 ];
 
-function CareerWatch() {
-  const [now, setNow] = React.useState(new Date());
-  const [endAt, setEndAt] = React.useState(null);
-  React.useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const left = endAt ? Math.max(0, endAt - now.getTime()) : 0;
-  const min = Math.floor(left / 60000);
-  const sec = Math.floor((left % 60000) / 1000);
-  return <aside className="portfolioCareerWatch">
-    <div className="watchTop"><span>Career Watch</span><b>Live</b></div>
-    <strong>{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
-    <p>{now.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</p>
-    <div className="watchButtons">
-      <button type="button" onClick={() => setEndAt(Date.now() + 25 * 60000)}>25m Focus</button>
-      <button type="button" onClick={() => setEndAt(Date.now() + 45 * 60000)}>45m Sprint</button>
-      <button type="button" onClick={() => setEndAt(null)}>Reset</button>
-    </div>
-    <small>{endAt ? (left > 0 ? `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')} remaining` : 'Sprint complete. Take 5 min break.') : 'Ready for study sprint'}</small>
-  </aside>;
-}
-
 export function PremiumPortfolio() {
   const photo = readStore('profilePhoto', defaultPhoto);
   const allSkills = Object.values(cvSkills).flat();
@@ -108,8 +85,6 @@ export function PremiumPortfolio() {
         </div>
       </aside>
     </section>
-
-    <CareerWatch />
 
     <section className="premiumTrustStrip">
       <span>Admin + Developer</span><span>Apex + LWC</span><span>Flow Automation</span><span>REST Integration</span><span>UAT + Deployment</span>
