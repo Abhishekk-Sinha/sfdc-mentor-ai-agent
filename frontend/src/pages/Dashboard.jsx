@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { companies } from '../data/companies';
 import { roadmap90 } from '../data/roadmap';
 import { Layout, Page, Card, Stat, Progress } from '../components/UI';
+import { CareerWatch } from '../components/CareerWatch';
 import { readStore } from '../utils/storage';
 import { DASHBOARD_HERO_ACTIONS, PREMIUM_PATH_STEPS, QUICK_START_CARDS, TOOL_GROUPS } from '../config/dashboardConfig';
 
@@ -131,6 +132,7 @@ function DashboardStats({ activeDay, today, completedTasks, totalTasks, savedAns
 function DashboardDeepGrid({ today, totalTasks, completedTasks, savedAnswers, strong, applied, weeklyResults }) {
   return <div className="dashboardDeepGrid">
     <Card title="Today Focus" subtitle="Do only these things first"><div className="mission"><p><b>Salesforce:</b> {today.salesforce}</p><p><b>DSA:</b> {today.dsa}</p><p><b>System Design:</b> {today.systemDesign}</p><p><b>Project:</b> {today.projectTask}</p><p><b>Interview:</b> {today.interviewTask}</p><Link className="btn cyan" to="/practice">Open Question Bank</Link></div></Card>
+    <Card title="Career Watch" subtitle="Private focus timer for daily learning sprint"><CareerWatch compact /></Card>
     <Card title="Progress Breakdown" subtitle="Your score increases from real saved work"><p>24h tasks</p><Progress value={totalTasks ? completedTasks / totalTasks * 100 : 0}/><p>Saved answers</p><Progress value={Math.min(100, savedAnswers * 4)}/><p>Strong topics</p><Progress value={Math.min(100, strong * 5)}/><p>Job pipeline</p><Progress value={Math.min(100, applied * 2)}/></Card>
     <Card title="Career Momentum" subtitle="Keep one visible daily proof."><div className="careerMomentum"><div><b>{applied}</b><span>Applications</span></div><div><b>{savedAnswers}</b><span>Saved Answers</span></div><div><b>{Object.keys(weeklyResults).length}</b><span>Weekly Tests</span></div></div><p className="hint">Best next action: save one interview answer and update one job note.</p></Card>
   </div>;
