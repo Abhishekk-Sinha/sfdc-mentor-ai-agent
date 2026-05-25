@@ -81,23 +81,16 @@ function copyText(text) {
 
 export function AIMentor() {
   const [question,setQuestion]=React.useState('');
-  const [sessions,setSessions]=React.useState(()=>readStore('mentorSessions',[{id:1,title:'New Chat',messages:[]}])) ;
-  const [activeId,setActiveId]=React.useState(()=>readStore('mentorActiveSession',1));
+  const [messages,setMessages]=React.useState([]);
   const [mode,setMode]=React.useState('General Mentor');
   const [difficulty,setDifficulty]=React.useState('2+ Years');
   const [interviewMode,setInterviewMode]=React.useState('Technical Round');
   const [useSavedData,setUseSavedData]=React.useState(true);
   const [backendMode,setBackendMode]=React.useState('local');
-  const [historySearch,setHistorySearch]=React.useState('');
   const [loading,setLoading]=React.useState(false);
   const [toast,setToast]=React.useState('');
   const [status,setStatus]=React.useState({backend:'checking',ollama:'checking',web:'ready'});
 
-  const active = sessions.find(s=>s.id===activeId) || sessions[0];
-  const messages = active?.messages || [];
-  const filteredSessions = sessions.filter(s=>s.title.toLowerCase().includes(historySearch.toLowerCase()) || s.messages.some(m=>m.text.toLowerCase().includes(historySearch.toLowerCase())));
-
-  React.useEffect(()=>{ writeStore('mentorSessions',sessions); writeStore('mentorActiveSession',activeId); },[sessions,activeId]);
   React.useEffect(()=>{ checkStatus(); },[]);
   React.useEffect(()=>{ if(toast){ const t=setTimeout(()=>setToast(''),2200); return ()=>clearTimeout(t); } },[toast]);
 
@@ -106,21 +99,10 @@ export function AIMentor() {
     try{ const r=await fetch(`${backendBase}/api/ollama-status`); const data=await r.json(); setStatus(s=>({...s,ollama:data.ok?'online':'offline'})); }catch{ setStatus(s=>({...s,ollama:'offline'})); }
   }
 
-  function updateActiveMessages(nextMessages, title){
-    setSessions(prev=>prev.map(s=>s.id===activeId?{...s,title:title || s.title,messages:nextMessages,updatedAt:new Date().toLocaleString()}:s));
-  }
-
   function newChat(){
-    const id=Date.now();
-    setSessions(prev=>[{id,title:'New Chat',messages:[],createdAt:new Date().toLocaleString()},...prev]);
-    setActiveId(id);
-  }
-
-  function deleteChat(id){
-    const next=sessions.filter(s=>s.id!==id);
-    setSessions(next.length?next:[{id:1,title:'New Chat',messages:[]}]);
-    if(activeId===id) setActiveId(next[0]?.id || 1);
-    setToast('Chat deleted');
+    setMessages([]);
+    setQuestion('');
+    setToast('Chat cleared');
   }
 
   function saveToNotes(item){
@@ -143,11 +125,11 @@ export function AIMentor() {
 
   function pinMessage(index){
     const next=messages.map((m,i)=>i===index?{...m,pinned:!m.pinned}:m);
-    updateActiveMessages(next);
+    setMessages(next);
   }
 
   function deleteMessage(index){
-    updateActiveMessages(messages.filter((_,i)=>i!==index));
+    setMessages(messages.filter((_,i)=>i!==index));
     setToast('Message deleted');
   }
 
@@ -157,7 +139,7 @@ export function AIMentor() {
       type==='simple' ? `Simple English:\n\n${text}\n\nIn short: explain what it is, where it is used, how you implemented it, and what result it created.`:
       type==='scenario' ? `Scenario Questions:\n\n1. A business team needs this feature. How will you design it?\n2. How will you secure data access?\n3. How will you test edge cases?\n4. What can go wrong in production?\n5. How will you explain impact to client?`:
       `Follow-up Questions:\n\n1. Why did you choose this approach?\n2. What are the edge cases?\n3. How will it scale?\n4. How will you test it?\n5. What will you improve?`;
-    updateActiveMessages([...messages,{role:'assistant',text:output,time:new Date().toLocaleString(),prompt:type,links:[]}]);
+    setMessages([...messages,{role:'assistant',text:output,time:new Date().toLocaleString(),prompt:type,links:[]}]);
   }
 
   async function ask(){
@@ -176,24 +158,18 @@ export function AIMentor() {
     }
     if(!answer){ answer = buildLocalMentorAnswer(q,mode,difficulty,interviewMode); }
     const assistantMessage={role:'assistant',text:answer,time:new Date().toLocaleString(),source,links,prompt:q,pinned:false};
-    const title = active?.title==='New Chat' ? q.slice(0,42) : active?.title;
-    updateActiveMessages([...messages,userMessage,assistantMessage],title);
-    setQuestion(''); setLoading(false); setToast('Answer generated and saved');
+    setMessages([...messages,userMessage,assistantMessage]);
+    setQuestion(''); setLoading(false); setToast('Answer generated');
   }
 
-  return <Layout><Page><Hero title="AI Mentor Agent Pro" subtitle=""><div className="mentorStatus"><span className={status.backend==='online'?'online':'offline'}>Backend {status.backend}</span><span className={status.ollama==='online'?'online':'offline'}>Ollama {status.ollama}</span><span className="online">Web links ready</span><button className="btn small ghost" onClick={checkStatus}>Refresh</button></div></Hero>
+  return <Layout><Page><Hero title="AI Mentor Agent Pro" subtitle="Private mentor chat. History is not saved automatically."><div className="mentorStatus"><span className={status.backend==='online'?'online':'offline'}>Backend {status.backend}</span><span className={status.ollama==='online'?'online':'offline'}>Ollama {status.ollama}</span><span className="online">Web links ready</span><button className="btn small ghost" onClick={checkStatus}>Refresh</button></div></Hero>
     {toast && <div className="toast">✅ {toast}</div>}
-    <div className="mentorProLayout">
-      <aside className="mentorSidebar">
-        <button className="btn cyan full" onClick={newChat}>+ New Chat</button>
-        <input value={historySearch} onChange={e=>setHistorySearch(e.target.value)} placeholder="Search chat history" />
-        <div className="mentorChats">{filteredSessions.map(s=><button key={s.id} className={s.id===activeId?'active mentorChat':'mentorChat'} onClick={()=>setActiveId(s.id)}><b>{s.title}</b><small>{s.messages.length} messages</small><span onClick={(e)=>{e.stopPropagation();deleteChat(s.id)}}>🗑️</span></button>)}</div>
-      </aside>
-      <section className="mentorMain">
+    <div className="mentorCleanLayout">
+      <section className="mentorMain mentorMainFull">
         <Card title="Mentor Controls" subtitle="Choose mode, difficulty, and data source"><div className="mentorControls"><select value={mode} onChange={e=>setMode(e.target.value)}>{mentorModes.map(x=><option key={x}>{x}</option>)}</select><select value={difficulty} onChange={e=>setDifficulty(e.target.value)}>{difficultyOptions.map(x=><option key={x}>{x}</option>)}</select><select value={interviewMode} onChange={e=>setInterviewMode(e.target.value)}>{['Technical Round','HR Round','Managerial Round','Project Round','Mock Interview'].map(x=><option key={x}>{x}</option>)}</select><select value={backendMode} onChange={e=>setBackendMode(e.target.value)}><option value="local">Local Only</option><option value="backend">FastAPI Backend</option><option value="ollama">Ollama Local AI</option></select><label className="toggleLine"><input type="checkbox" checked={useSavedData} onChange={e=>setUseSavedData(e.target.checked)}/> Ask from my saved data first</label></div></Card>
         <Card title="Prompt Templates" subtitle="One-click premium prompts"><div className="promptGrid">{promptTemplates.map(p=><button key={p} className="btn ghost" onClick={()=>setQuestion(p)}>{p}</button>)}</div></Card>
         <div className="mentorMessages">{messages.length?messages.map((m,i)=><div key={i} className={m.role==='user'?'msg userMsg':'msg aiMsg'}><div className="msgHead"><b>{m.role==='user'?'You':'AI Mentor'}</b><small>{m.source || ''} {m.time}</small>{m.pinned&&<span className="pill">Pinned</span>}</div><pre>{m.text}</pre>{m.links?.length>0&&<div className="linkCards">{m.links.map(l=><a key={l.url || l} href={l.url || l} target="_blank">{l.title || 'Open Link'}</a>)}</div>}{m.role==='assistant'&&<div className="mentorActions"><button onClick={()=>copyText(m.text)} className="btn small ghost">Copy</button><button onClick={()=>downloadText('mentor-answer.txt',m.text)} className="btn small ghost">Export</button><button onClick={()=>saveToNotes(m)} className="btn small cyan">Save Notes</button><button onClick={()=>addToRevision(m)} className="btn small ghost">Add Revision</button><button onClick={()=>markTopic(m,'Weak')} className="btn small ghost">Weak</button><button onClick={()=>markTopic(m,'Strong')} className="btn small ghost">Strong</button><button onClick={()=>pinMessage(i)} className="btn small ghost">Pin</button><button onClick={()=>transform(m.text,'star')} className="btn small ghost">STAR</button><button onClick={()=>transform(m.text,'hinglish')} className="btn small ghost">Hinglish</button><button onClick={()=>transform(m.text,'simple')} className="btn small ghost">Simple English</button><button onClick={()=>transform(m.text,'scenario')} className="btn small ghost">Scenario Qs</button><button onClick={()=>transform(m.text,'followup')} className="btn small ghost">Follow-ups</button><button onClick={()=>deleteMessage(i)} className="btn small danger">Delete</button></div>}</div>):<div className="mentorEmpty"><h2>Ask anything to your AI Mentor</h2><p>Salesforce, Apex, LWC, SOQL, Flow, DSA, System Design, JD, project explanation, resume bullet, or interview answer.</p></div>}</div>
-        <Card title="Ask Mentor" className="mentorComposer"><textarea value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&e.ctrlKey)ask();}} placeholder="Ask Salesforce, DSA, JD, project, interview, error... Ctrl+Enter to ask"/><div className="row"><button className="btn cyan" disabled={loading} onClick={ask}>{loading?'Thinking...':'Ask Mentor'}</button><button className="btn ghost" onClick={()=>window.open(`https://www.google.com/search?q=${encodeURIComponent(question)}`,'_blank')}>Search Web</button><button className="btn ghost" onClick={()=>setQuestion('')}>Clear</button></div></Card>
+        <Card title="Ask Mentor" className="mentorComposer"><textarea value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&e.ctrlKey)ask();}} placeholder="Ask Salesforce, DSA, JD, project, interview, error... Ctrl+Enter to ask"/><div className="row"><button className="btn cyan" disabled={loading} onClick={ask}>{loading?'Thinking...':'Ask Mentor'}</button><button className="btn ghost" onClick={()=>window.open(`https://www.google.com/search?q=${encodeURIComponent(question)}`,'_blank')}>Search Web</button><button className="btn ghost" onClick={()=>setQuestion('')}>Clear</button><button className="btn ghost" onClick={newChat}>Clear Chat</button></div></Card>
       </section>
     </div>
   </Page></Layout>;
