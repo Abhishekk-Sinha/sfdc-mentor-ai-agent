@@ -9,7 +9,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="2.2.0")
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.3.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 DB_PATH = Path(__file__).resolve().parent.parent / "mentor_storage.sqlite3"
@@ -20,7 +20,7 @@ def db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_key TEXT,
+            item_key TEXT UNIQUE,
             item_type TEXT,
             title TEXT,
             payload TEXT NOT NULL,
@@ -32,6 +32,27 @@ def db():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_items_type ON items(item_type)")
     conn.commit()
     return conn
+
+def normalize_payload(item: Dict[str, Any]):
+    now = time.time()
+    item_key = str(item.get("key") or item.get("storageKey") or item.get("id") or item.get("name") or f"item-{int(now*1000)}")
+    item_type = str(item.get("type") or item.get("category") or item.get("module") or "frontend-store")
+    title = str(item.get("title") or item.get("label") or item.get("name") or item_key)[:250]
+    if "data" in item and len(item.keys()) <= 5:
+        payload_obj = item.get("data")
+    else:
+        payload_obj = item
+    payload = json.dumps(payload_obj, ensure_ascii=False)
+    return item_key, item_type, title, payload, now
+
+def upsert_item(conn, item: Dict[str, Any]):
+    item_key, item_type, title, payload, now = normalize_payload(item)
+    existing = conn.execute("SELECT id FROM items WHERE item_key=?", (item_key,)).fetchone()
+    if existing:
+        conn.execute("UPDATE items SET item_type=?, title=?, payload=?, updated_at=? WHERE item_key=?", (item_type, title, payload, now, item_key))
+        return existing["id"], item_key, item_type
+    cur = conn.execute("INSERT INTO items(item_key,item_type,title,payload,created_at,updated_at) VALUES(?,?,?,?,?,?)", (item_key, item_type, title, payload, now, now))
+    return cur.lastrowid, item_key, item_type
 
 class MentorRequest(BaseModel):
     question: str
@@ -47,35 +68,31 @@ class SearchRequest(BaseModel):
     query: str = ""
     limit: int = 20
 
+class SyncRequest(BaseModel):
+    items: Dict[str, Any]
+    source: Optional[str] = "frontend-sync"
+
+class RestoreRequest(BaseModel):
+    items: Dict[str, Any]
+
 @app.get("/")
 def root():
-    return {"status": "running", "app": "SFDC Mentor Complete Backend", "docs": "/docs"}
+    return {"status": "running", "app": "SFDC Mentor Complete Backend", "docs": "/docs", "sqlite_db": str(DB_PATH)}
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "mentor-backend", "mode": "local + sqlite + ollama + search-links", "version": "2.2.0"}
+    return {"ok": True, "service": "mentor-backend", "mode": "free local + sqlite + ollama + search-links", "version": "2.3.0", "sqlite_db": str(DB_PATH)}
 
 @app.post("/api/items")
 def save_item(item: Dict[str, Any]):
     """Generic persistence endpoint used by frontend auto-sync.
     Accepts any JSON shape and stores it safely in SQLite.
     """
-    now = time.time()
-    item_key = str(item.get("key") or item.get("storageKey") or item.get("id") or item.get("name") or f"item-{int(now*1000)}")
-    item_type = str(item.get("type") or item.get("category") or item.get("module") or "general")
-    title = str(item.get("title") or item.get("label") or item.get("name") or item_key)[:250]
-    payload = json.dumps(item, ensure_ascii=False)
     conn = db()
-    existing = conn.execute("SELECT id FROM items WHERE item_key=?", (item_key,)).fetchone()
-    if existing:
-        conn.execute("UPDATE items SET item_type=?, title=?, payload=?, updated_at=? WHERE item_key=?", (item_type, title, payload, now, item_key))
-        row_id = existing["id"]
-    else:
-        cur = conn.execute("INSERT INTO items(item_key,item_type,title,payload,created_at,updated_at) VALUES(?,?,?,?,?,?)", (item_key, item_type, title, payload, now, now))
-        row_id = cur.lastrowid
+    row_id, item_key, item_type = upsert_item(conn, item)
     conn.commit()
     conn.close()
-    return {"ok": True, "id": row_id, "key": item_key, "type": item_type}
+    return {"ok": True, "id": row_id, "key": item_key, "type": item_type, "sqlite_db": str(DB_PATH)}
 
 @app.get("/api/items")
 def list_items(key: Optional[str] = None, type: Optional[str] = None, limit: int = 100):
@@ -99,7 +116,53 @@ def list_items(key: Optional[str] = None, type: Optional[str] = None, limit: int
         except Exception:
             payload = r["payload"]
         out.append({"id": r["id"], "key": r["item_key"], "type": r["item_type"], "title": r["title"], "payload": payload, "updated_at": r["updated_at"]})
-    return {"ok": True, "items": out}
+    return {"ok": True, "items": out, "sqlite_db": str(DB_PATH)}
+
+@app.delete("/api/items/{key}")
+def delete_item(key: str):
+    conn = db()
+    cur = conn.execute("DELETE FROM items WHERE item_key=?", (key,))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "deleted": cur.rowcount, "key": key}
+
+@app.post("/api/sync")
+def sync_items(req: SyncRequest):
+    """Bulk mirror frontend localStorage into SQLite.
+    The frontend can keep localStorage for instant UI, while SQLite becomes the durable backend copy.
+    """
+    conn = db()
+    saved = 0
+    for key, value in (req.items or {}).items():
+        upsert_item(conn, {"key": key, "data": value, "source": req.source or "frontend-sync", "type": "frontend-store"})
+        saved += 1
+    conn.commit()
+    conn.close()
+    return {"ok": True, "saved": saved, "sqlite_db": str(DB_PATH)}
+
+@app.get("/api/export")
+def export_items():
+    conn = db()
+    rows = conn.execute("SELECT item_key, payload FROM items ORDER BY item_key").fetchall()
+    conn.close()
+    items: Dict[str, Any] = {}
+    for r in rows:
+        try:
+            items[r["item_key"]] = json.loads(r["payload"])
+        except Exception:
+            items[r["item_key"]] = r["payload"]
+    return {"ok": True, "items": items, "count": len(items), "sqlite_db": str(DB_PATH)}
+
+@app.post("/api/restore")
+def restore_items(req: RestoreRequest):
+    conn = db()
+    saved = 0
+    for key, value in (req.items or {}).items():
+        upsert_item(conn, {"key": key, "data": value, "source": "restore", "type": "frontend-store"})
+        saved += 1
+    conn.commit()
+    conn.close()
+    return {"ok": True, "saved": saved, "sqlite_db": str(DB_PATH)}
 
 @app.post("/api/search")
 def search_items(req: SearchRequest):
@@ -129,7 +192,7 @@ def analytics():
     conn.close()
     by_type = {r["item_type"]: r["c"] for r in rows}
     score = min(100, 20 + total * 2 + by_type.get("answer", 0) * 3 + by_type.get("job", 0) * 2)
-    return {"ok": True, "items": total, "by_type": by_type, "job_ready_score": score}
+    return {"ok": True, "items": total, "by_type": by_type, "job_ready_score": score, "sqlite_db": str(DB_PATH)}
 
 @app.get("/api/ollama-status")
 def ollama_status():
@@ -201,7 +264,7 @@ def api_search_links(q: str):
 @app.get("/api/dashboard-summary")
 def dashboard_summary():
     data = analytics()
-    return {"status": "ready", "job_ready_score": data.get("job_ready_score", 0), "items": data.get("items", 0), "next_actions": ["Complete one 45-minute Salesforce sprint", "Save one interview answer", "Mark one topic Strong or Weak", "Apply/follow up on one job"]}
+    return {"status": "ready", "job_ready_score": data.get("job_ready_score", 0), "items": data.get("items", 0), "sqlite_db": str(DB_PATH), "next_actions": ["Complete one 45-minute Salesforce sprint", "Save one interview answer", "Mark one topic Strong or Weak", "Apply/follow up on one job"]}
 
 def backend_mentor_answer(q: str, mode: str, difficulty: str, interview_mode: str, saved_context: str = "") -> str:
     context_line = f"\nSaved app context found:\n{saved_context}\n" if saved_context else "\nNo saved context found yet. Save notes/answers/jobs first for RAG guidance.\n"
