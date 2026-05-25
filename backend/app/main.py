@@ -7,12 +7,15 @@ import json
 import urllib.request
 import sqlite3
 import time
+import os
 from pathlib import Path
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="2.3.0")
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.4.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 DB_PATH = Path(__file__).resolve().parent.parent / "mentor_storage.sqlite3"
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
 def db():
     conn = sqlite3.connect(DB_PATH)
@@ -81,13 +84,10 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "mentor-backend", "mode": "free local + sqlite + ollama + search-links", "version": "2.3.0", "sqlite_db": str(DB_PATH)}
+    return {"ok": True, "service": "mentor-backend", "mode": "free local + sqlite + ollama + search-links", "version": "2.4.0", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL}
 
 @app.post("/api/items")
 def save_item(item: Dict[str, Any]):
-    """Generic persistence endpoint used by frontend auto-sync.
-    Accepts any JSON shape and stores it safely in SQLite.
-    """
     conn = db()
     row_id, item_key, item_type = upsert_item(conn, item)
     conn.commit()
@@ -128,9 +128,6 @@ def delete_item(key: str):
 
 @app.post("/api/sync")
 def sync_items(req: SyncRequest):
-    """Bulk mirror frontend localStorage into SQLite.
-    The frontend can keep localStorage for instant UI, while SQLite becomes the durable backend copy.
-    """
     conn = db()
     saved = 0
     for key, value in (req.items or {}).items():
@@ -197,12 +194,19 @@ def analytics():
 @app.get("/api/ollama-status")
 def ollama_status():
     try:
-        request = urllib.request.Request("http://127.0.0.1:11434/api/tags")
-        with urllib.request.urlopen(request, timeout=3) as response:
+        request = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/tags")
+        with urllib.request.urlopen(request, timeout=5) as response:
             data = json.loads(response.read().decode("utf-8"))
-        return {"ok": True, "models": data.get("models", [])}
+        model_names = [m.get("name") for m in data.get("models", [])]
+        return {"ok": True, "base_url": OLLAMA_BASE_URL, "configured_model": OLLAMA_MODEL, "model_available": OLLAMA_MODEL in model_names, "models": data.get("models", [])}
     except Exception as exc:
-        return {"ok": False, "error": str(exc)}
+        return {"ok": False, "base_url": OLLAMA_BASE_URL, "configured_model": OLLAMA_MODEL, "error": str(exc)}
+
+def call_ollama(prompt: str):
+    payload = json.dumps({"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}).encode("utf-8")
+    request = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/generate", data=payload, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=90) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 @app.post("/api/mentor")
 def mentor(req: MentorRequest):
@@ -230,13 +234,10 @@ Saved context:
 {saved_context}
 Question: {q}
 Give: beginner explanation, deep architect view, project use case, interview answer, and next action."""
-            payload = json.dumps({"model": "llama3.2", "prompt": prompt, "stream": False}).encode("utf-8")
-            request = urllib.request.Request("http://127.0.0.1:11434/api/generate", data=payload, headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(request, timeout=30) as response:
-                data = json.loads(response.read().decode("utf-8"))
-            return {"answer": data.get("response", "Ollama returned no response."), "source": "ollama-rag", "context": saved_context, "links": []}
+            data = call_ollama(prompt)
+            return {"answer": data.get("response", "Ollama returned no response."), "source": f"ollama-rag:{OLLAMA_MODEL}", "context": saved_context, "links": []}
         except Exception as exc:
-            return {"answer": f"Ollama offline or unavailable: {exc}. Use saved context and search links below.\n\n{backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context)}", "source": "fallback", "context": saved_context, "links": search_links(q)}
+            return {"answer": f"Ollama unavailable: {exc}\n\nConfigured model: {OLLAMA_MODEL}\nOllama base URL: {OLLAMA_BASE_URL}\n\nUse saved context and search links below.\n\n{backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context)}", "source": "fallback", "context": saved_context, "links": search_links(q)}
     return {"answer": backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context), "source": "fastapi-sqlite-mentor" if saved_context else "fastapi-mentor", "context": saved_context, "links": search_links(q)}
 
 @app.post("/api/review-answer")
