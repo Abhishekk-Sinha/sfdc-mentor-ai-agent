@@ -6,23 +6,25 @@ import { profile, cvSkills } from '../data/profile';
 import { keywordMatch } from '../utils/scoring';
 import { downloadText, readStore, writeStore } from '../utils/storage';
 
-const profileKeywords = ['Salesforce Developer','Apex','Apex Trigger','LWC','Flow','SOQL','REST API','Salesforce Admin','Lightning Web Components','Integration','Security','Reports','CRM','Einstein AI','Agentforce','Sales Cloud','Service Cloud'];
+const profileKeywords = ['Salesforce Developer','Apex','Apex Trigger','LWC','Flow','SOQL','REST API','Salesforce Admin','Lightning Web Components','Integration','Security','Reports','CRM','Einstein AI','Agentforce','Sales Cloud','Service Cloud','Data Cloud','MuleSoft'];
 const statuses = ['All','Saved','Applied','HR Call','Technical','Offer','Rejected'];
 const categories = companyCategories || ['All','Startup','Mid Company','MNC'];
 
 function applySearch(companyName = '', role = 'Salesforce Developer', location = 'India / Remote') {
-  return `https://www.google.com/search?q=${encodeURIComponent(`${companyName} ${role} Apex LWC Flow jobs ${location} careers`)}`;
+  return `https://www.google.com/search?q=${encodeURIComponent(`${companyName} ${role} jobs ${location} careers`)}`;
 }
 function professionalApplyNote(companyName = 'Company') {
   return `Hi Team,\n\nI am interested in Salesforce Developer opportunities at ${companyName}. I have hands-on experience with Apex, Lightning Web Components, Flows, SOQL, REST API integrations, reports/dashboards, deployments and production support.\n\nI can contribute to CRM implementation, automation, integrations, issue fixing and scalable Salesforce development.\n\nRegards,\n${profile.name}\n${profile.email}\n${profile.phone}`;
 }
 function fitScore(row) {
   const text = `${row.name} ${row.website || ''} ${row.category || ''}`.toLowerCase();
-  const score = ['cloud','tech','systems','solutions','consulting','salesforce','crm','digital','infotech','ai'].reduce((n,k)=>n+(text.includes(k)?7:0),0);
+  const score = ['cloud','tech','systems','solutions','consulting','salesforce','crm','digital','infotech','ai','agentforce','data cloud','mulesoft'].reduce((n,k)=>n+(text.includes(k)?7:0),0);
   return Math.min(100, 55 + score);
 }
 function normalizeJobs(rows = []) {
-  return rows.map((row, index) => ({ id: row.id || index + 1, name: row.name || `Company ${index + 1}`, category: row.category || 'Mid Company', website: row.website || '', status: row.status || 'Saved', saved: Boolean(row.saved), applied: Boolean(row.applied), notes: row.notes || '', priority: row.priority || 'Medium', followUp: row.followUp || '', ...row }));
+  const oldGenerated = rows.length === 800 || rows.some(r => String(r.name || '').includes(' Target '));
+  const source = oldGenerated ? companies : rows;
+  return source.map((row, index) => ({ id: row.id || index + 1, name: row.name || `Company ${index + 1}`, category: row.category || 'Mid Company', website: row.website || '', status: row.status || 'Saved', saved: Boolean(row.saved), applied: Boolean(row.applied), notes: row.notes || '', priority: row.priority || 'Medium', followUp: row.followUp || '', ...row }));
 }
 function copyText(text) { return navigator.clipboard?.writeText(text).catch(() => {}); }
 function cleanRoleText(value = '') { return String(value).split(',').map(item => item.trim()).filter(Boolean); }
@@ -36,7 +38,8 @@ export function JobTracker() {
   const [applyRole,setApplyRole]=React.useState(()=>readStore('applyRole','Salesforce Developer'));
   const [applyLocation,setApplyLocation]=React.useState(()=>readStore('applyLocation','India / Remote'));
 
-  const list=rows.filter(r => (filter.status==='All'||r.status===filter.status) && (filter.category==='All'||(r.category||'Mid Company')===filter.category) && r.name.toLowerCase().includes(filter.q.toLowerCase())).slice(0,300);
+  const filtered=rows.filter(r => (filter.status==='All'||r.status===filter.status) && (filter.category==='All'||(r.category||'Mid Company')===filter.category) && r.name.toLowerCase().includes(filter.q.toLowerCase()));
+  const list=filtered.slice(0,1100);
   const update=(id,patch)=>{const n=rows.map(r=>r.id===id?{...r,...patch}:r);setRows(n);writeStore('jobs',n)};
   const appliedCount = rows.filter(r => r.applied || r.status === 'Applied').length;
   const savedCount = rows.filter(r => r.saved || r.status === 'Saved').length;
@@ -49,10 +52,11 @@ export function JobTracker() {
     setApplyRole(next); writeStore('applyRole', next);
   };
   const queueTop=()=>{
-    const ids=rows.filter(r=>!r.applied).map(r=>({...r,fit:fitScore(r)})).sort((a,b)=>b.fit-a.fit).slice(0,8).map(r=>r.id);
-    const n=rows.map(r=>ids.includes(r.id)?{...r,saved:true,status:r.status||'Saved',notes:r.notes || `Profile match: ${applyRole} - ${applyLocation}. Next action: click company name, verify JD, customize resume, apply manually, and add follow-up date.`}:r);
+    const ids=filtered.filter(r=>!r.applied).map(r=>({...r,fit:fitScore(r)})).sort((a,b)=>b.fit-a.fit).slice(0,25).map(r=>r.id);
+    const n=rows.map(r=>ids.includes(r.id)?{...r,saved:true,status:r.status||'Saved',priority:'High',notes:r.notes || `Profile match: ${applyRole} - ${applyLocation}. Next action: click company name, verify JD, customize resume, apply manually, and add follow-up date.`}:r);
     setRows(n); writeStore('jobs',n); setSelected(ids);
   };
+  const resetTo1100=()=>{const n=normalizeJobs(companies);setRows(n);writeStore('jobs',n);setSelected([]);setFilter({q:'',status:'All',category:'All'});};
   const saveApplySettings=()=>{writeStore('applyRole',applyRole);writeStore('applyLocation',applyLocation)};
   const addCustomCompany=()=>{
     const name = customCompany.trim(); if(!name) return;
@@ -61,10 +65,10 @@ export function JobTracker() {
     setRows(next); writeStore('jobs',next); setCustomCompany(''); setFilter({...filter,q:name,category:'All'});
   };
 
-  return <Layout><Page><Hero title="Job Tracker" subtitle="Professional Salesforce job pipeline with categorized companies, manual search, company career links, notes and follow-up tracking."/>
+  return <Layout><Page><Hero title="Job Tracker" subtitle="Professional Salesforce job pipeline with 1100 categorized company targets, manual search, career links, notes and follow-up tracking."/>
     <div className="statsGrid premiumStatsGrid">
-      <Stat label="Total Companies" value={rows.length} icon="CO" note="300+ categorized list"/>
-      <Stat label="Startup" value={categoryCounts.Startup || 0} icon="ST" note="Product companies"/>
+      <Stat label="Total Companies" value={rows.length} icon="CO" note="1100 Salesforce targets"/>
+      <Stat label="Startup" value={categoryCounts.Startup || 0} icon="ST" note="Product/SaaS companies"/>
       <Stat label="Mid Company" value={categoryCounts['Mid Company'] || 0} icon="MID" note="Consulting & partners"/>
       <Stat label="MNC" value={categoryCounts.MNC || 0} icon="MNC" note="Large enterprises"/>
     </div>
@@ -72,32 +76,32 @@ export function JobTracker() {
       <Stat label="Saved" value={savedCount} icon="SV" note="Shortlisted"/>
       <Stat label="Applied" value={appliedCount} icon="AP" note="Submitted manually"/>
       <Stat label="Active Pipeline" value={activeCount} icon="IN" note="Interview process"/>
-      <Stat label="Visible Results" value={list.length} icon="VIEW" note="After filters"/>
+      <Stat label="Visible Results" value={filtered.length} icon="VIEW" note="After filters"/>
     </div>
 
     <Card title="Profile-Based Apply Assistant" subtitle="Click any skill chip to add it into Target Role, then click company name in the table to open career search.">
       <div className="autoApplyPanel">
         <div className="grid2"><Field label="Target Role" value={applyRole} onChange={setApplyRole}/><Field label="Location" value={applyLocation} onChange={setApplyLocation}/></div>
         <div className="professionalBadgeRow">{profileKeywords.map(k=><button type="button" className="skillChipButton" key={k} onClick={()=>addKeywordToRole(k)} title={`Add ${k} to Target Role`}>{k}</button>)}</div>
-        <div className="row"><button className="btn cyan" onClick={()=>{saveApplySettings();queueTop();}}>Generate Apply Queue</button><button className="btn ghost" onClick={saveApplySettings}>Save Target</button><a className="btn ghost" href={`https://www.google.com/search?q=${encodeURIComponent(`${applyRole} ${applyLocation} Salesforce Apex LWC jobs`)}`} target="_blank" rel="noreferrer">Open Job Search</a></div>
-        <p className="hint">Click Einstein AI / Agentforce / Apex / LWC chips to add them into Target Role automatically.</p>
+        <div className="row"><button className="btn cyan" onClick={()=>{saveApplySettings();queueTop();}}>Generate Apply Queue</button><button className="btn ghost" onClick={saveApplySettings}>Save Target</button><button className="btn ghost" onClick={resetTo1100}>Reset 1100 List</button><a className="btn ghost" href={`https://www.google.com/search?q=${encodeURIComponent(`${applyRole} ${applyLocation} Salesforce Apex LWC jobs`)}`} target="_blank" rel="noreferrer">Open Job Search</a></div>
+        <p className="hint">Generate Apply Queue marks top 25 visible matching companies as Saved/High Priority. Reset 1100 List refreshes your company list if old 300/800 data is still saved in browser.</p>
       </div>
     </Card>
 
     <Card title="Search, Category Filter & Custom Company" subtitle="Search by company name, filter Startup / Mid Company / MNC, or add your own company name.">
-      <div className="filterBar"><input value={filter.q} onChange={e=>setFilter({...filter,q:e.target.value})} placeholder="Search any company name"/><select value={filter.category} onChange={e=>setFilter({...filter,category:e.target.value})}>{categories.map(x=><option key={x}>{x}</option>)}</select><select value={filter.status} onChange={e=>setFilter({...filter,status:e.target.value})}>{statuses.map(x=><option key={x}>{x}</option>)}</select><button className="btn" onClick={()=>{const n=rows.map(r=>selected.includes(r.id)?{...r,status:'Applied',applied:true}:r);setRows(n);writeStore('jobs',n)}}>Bulk Applied</button><button className="btn ghost" onClick={()=>downloadText('job-tracker.json',JSON.stringify(rows,null,2),'application/json')}>Export</button></div>
+      <div className="filterBar"><input value={filter.q} onChange={e=>setFilter({...filter,q:e.target.value})} placeholder="Search any company name"/><select value={filter.category} onChange={e=>setFilter({...filter,category:e.target.value})}>{categories.map(x=><option key={x}>{x}</option>)}</select><select value={filter.status} onChange={e=>setFilter({...filter,status:e.target.value})}>{statuses.map(x=><option key={x}>{x}</option>)}</select><button className="btn" onClick={()=>{const n=rows.map(r=>selected.includes(r.id)?{...r,status:'Applied',applied:true}:r);setRows(n);writeStore('jobs',n)}}>Bulk Applied</button><button className="btn ghost" onClick={()=>downloadText('job-tracker-1100.json',JSON.stringify(rows,null,2),'application/json')}>Export</button></div>
       <div className="filterBar"><input value={customCompany} onChange={e=>setCustomCompany(e.target.value)} placeholder="Add company manually, e.g. Einstein AI partner"/><select value={customCategory} onChange={e=>setCustomCategory(e.target.value)}>{['Startup','Mid Company','MNC'].map(x=><option key={x}>{x}</option>)}</select><button className="btn cyan" onClick={addCustomCompany}>Add & Search</button></div>
     </Card>
 
-    <div className="tableWrap professionalJobTable"><table><thead><tr><th><input type="checkbox" onChange={e=>setSelected(e.target.checked?list.map(x=>x.id):[])}/></th><th>No.</th><th>Company</th><th>Category</th><th>Status</th><th>Checklist</th><th className="notesTh">Notes / Follow-up Details</th></tr></thead><tbody>{list.map(r=><tr key={r.id}><td><input type="checkbox" checked={selected.includes(r.id)} onChange={e=>setSelected(e.target.checked?[...selected,r.id]:selected.filter(x=>x!==r.id))}/></td><td><span className="numBox">{r.id}</span></td><td><div className="companyCell"><a className="companyCareerLink" href={applySearch(r.name, applyRole, applyLocation)} target="_blank" rel="noreferrer"><b>{r.name}</b></a><div className="row"><button className="btn small ghost" onClick={()=>copyText(professionalApplyNote(r.name))}>Copy Apply Note</button>{r.website && <a className="btn small ghost" href={r.website} target="_blank" rel="noreferrer">Company Site</a>}</div></div></td><td><select value={r.category || 'Mid Company'} onChange={e=>update(r.id,{category:e.target.value})}>{['Startup','Mid Company','MNC'].map(x=><option key={x}>{x}</option>)}</select></td><td><select value={r.status} onChange={e=>update(r.id,{status:e.target.value,applied:e.target.value==='Applied'})}>{statuses.filter(x=>x!=='All').map(x=><option key={x}>{x}</option>)}</select></td><td><label className="checkPill"><input type="checkbox" checked={r.saved} onChange={e=>update(r.id,{saved:e.target.checked})}/> Saved</label><label className="checkPill"><input type="checkbox" checked={r.applied} onChange={e=>update(r.id,{applied:e.target.checked,status:e.target.checked?'Applied':r.status})}/> Applied</label></td><td className="jobNotesCell"><textarea className="jobNoteArea" value={r.notes} onChange={e=>update(r.id,{notes:e.target.value})} placeholder="Applied link, recruiter, follow-up, JD keywords..."/><div className="row"><button className="btn small cyan" onClick={()=>update(r.id,{notes:r.notes, noteSavedAt:new Date().toLocaleString()})}>Save Note</button><small>{r.noteSavedAt}</small></div></td></tr>)}</tbody></table></div><p className="hint">Data saves in browser localStorage. Open Backup Center to see/export all saved data. Backend SQLite sync is separate and works when backend sync is connected.</p>
+    <div className="tableWrap professionalJobTable"><table><thead><tr><th><input type="checkbox" onChange={e=>setSelected(e.target.checked?list.map(x=>x.id):[])}/></th><th>No.</th><th>Company</th><th>Category</th><th>Priority</th><th>Status</th><th>Checklist</th><th className="notesTh">Notes / Follow-up Details</th></tr></thead><tbody>{list.map(r=><tr key={r.id}><td><input type="checkbox" checked={selected.includes(r.id)} onChange={e=>setSelected(e.target.checked?[...selected,r.id]:selected.filter(x=>x!==r.id))}/></td><td><span className="numBox">{r.id}</span></td><td><div className="companyCell"><a className="companyCareerLink" href={applySearch(r.name, applyRole, applyLocation)} target="_blank" rel="noreferrer"><b>{r.name}</b></a><div className="row"><button className="btn small ghost" onClick={()=>copyText(professionalApplyNote(r.name))}>Copy Apply Note</button>{r.website && <a className="btn small ghost" href={r.website} target="_blank" rel="noreferrer">Company Site</a>}</div></div></td><td><select value={r.category || 'Mid Company'} onChange={e=>update(r.id,{category:e.target.value})}>{['Startup','Mid Company','MNC'].map(x=><option key={x}>{x}</option>)}</select></td><td><select value={r.priority || 'Medium'} onChange={e=>update(r.id,{priority:e.target.value})}>{['High','Medium','Low'].map(x=><option key={x}>{x}</option>)}</select></td><td><select value={r.status} onChange={e=>update(r.id,{status:e.target.value,applied:e.target.value==='Applied'})}>{statuses.filter(x=>x!=='All').map(x=><option key={x}>{x}</option>)}</select></td><td><label className="checkPill"><input type="checkbox" checked={r.saved} onChange={e=>update(r.id,{saved:e.target.checked})}/> Saved</label><label className="checkPill"><input type="checkbox" checked={r.applied} onChange={e=>update(r.id,{applied:e.target.checked,status:e.target.checked?'Applied':r.status})}/> Applied</label></td><td className="jobNotesCell"><textarea className="jobNoteArea" value={r.notes} onChange={e=>update(r.id,{notes:e.target.value})} placeholder="Applied link, recruiter, follow-up, JD keywords..."/><div className="row"><button className="btn small cyan" onClick={()=>update(r.id,{notes:r.notes, noteSavedAt:new Date().toLocaleString()})}>Save Note</button><small>{r.noteSavedAt}</small></div></td></tr>)}</tbody></table></div><p className="hint">Showing {list.length} of {filtered.length} filtered results. Data saves in browser localStorage. Use Reset 1100 List if old saved data is still appearing.</p>
   </Page></Layout>;
 }
 
 export function MoreTools() {
   const jobs=readStore('jobs',companies); const notes=readStore('notes',[]); const docs=readStore('documents',[]); const applied=jobs.filter(j=>j.applied||j.status==='Applied').length;
-  const tools=[['Learning Coach','Smart daily plan, sprint timer, mistake bank, quiz, recap, and LinkedIn proof generator.','/learning-coach'],['24 Hours Time Tracker','Track every hour/minute: study, project, interview, job apply, break, and daily productivity dashboard.','/time-tracker'],['Notes Library','View/edit/delete/open uploaded notes and files.','/notes'],['Document Library','Central place for topic PDFs, Word files, images, and code files.','/documents'],['Job Tracker','Profile-based apply queue, 300 companies, website/search links, checklist, sorting and notes.','/job-tracker'],['Weekly Question Papers','Topic-wise 30-question paper for every week.','/weekly-tests'],['Skill Gap Analysis','Track Admin, Flow, Apex, Trigger, LWC, Integration skill strength.','/practice'],['Weak Topic Tracker','Mark weak topics, plan revision, and track improvement.','/focus'],['Revision Calendar','Spaced revision schedule.','/weekly-tests'],['Doubt Tracker','Store doubts with answer and next action.','/doubts'],['JD Matcher','Paste JD and compare Salesforce keywords with backend/Ollama guidance.','/jd-matcher'],['Resume Optimizer','Edit resume fields and check ATS readiness.','/resume'],['Backup Center','Export local app data as JSON.','/backup']];
+  const tools=[['Learning Coach','Smart daily plan, sprint timer, mistake bank, quiz, recap, and LinkedIn proof generator.','/learning-coach'],['24 Hours Time Tracker','Track every hour/minute: study, project, interview, job apply, break, and daily productivity dashboard.','/time-tracker'],['Notes Library','View/edit/delete/open uploaded notes and files.','/notes'],['Document Library','Central place for topic PDFs, Word files, images, and code files.','/documents'],['Job Tracker','Profile-based apply queue, 1100 companies, category filters, checklist, sorting and notes.','/job-tracker'],['Weekly Question Papers','Topic-wise 30-question paper for every week.','/weekly-tests'],['Skill Gap Analysis','Track Admin, Flow, Apex, Trigger, LWC, Integration skill strength.','/practice'],['Weak Topic Tracker','Mark weak topics, plan revision, and track improvement.','/focus'],['Revision Calendar','Spaced revision schedule.','/weekly-tests'],['Doubt Tracker','Store doubts with answer and next action.','/doubts'],['JD Matcher','Paste JD and compare Salesforce keywords with backend/Ollama guidance.','/jd-matcher'],['Resume Optimizer','Edit resume fields and check ATS readiness.','/resume'],['Backup Center','Export local app data as JSON.','/backup']];
   const resources=[['My Trailhead Profile',profile.trailhead],['Salesforce Trailhead','https://trailhead.salesforce.com'],['Apex Developer Guide','https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/'],['LWC Developer Guide','https://developer.salesforce.com/docs/platform/lwc/overview'],['Salesforce Careers','https://careers.salesforce.com']];
-  return <Layout><Page><Hero title="More Tools" subtitle="All job-ready tools are connected with useful data, links, and working local actions."/><div className="statsGrid"><Stat label="Notes" value={Array.isArray(notes)?notes.length:0} icon="NT"/><Stat label="Files" value={Array.isArray(docs)?docs.length:0} icon="FL"/><Stat label="Companies" value="300" icon="CO"/><Stat label="Applied" value={applied} icon="AP"/></div><div className="toolList">{tools.map(([t,d,l])=><Card key={t} title={t} subtitle={d} action={<Link className="btn" to={l}>Open Tool</Link>}/>)}</div><Card title="Quick Resources"><div className="resourceGrid">{resources.map(([t,l])=><a className="btn ghost" key={t} href={l} target="_blank" rel="noreferrer">{t}</a>)}</div></Card></Page></Layout>;
+  return <Layout><Page><Hero title="More Tools" subtitle="All job-ready tools are connected with useful data, links, and working local actions."/><div className="statsGrid"><Stat label="Notes" value={Array.isArray(notes)?notes.length:0} icon="NT"/><Stat label="Files" value={Array.isArray(docs)?docs.length:0} icon="FL"/><Stat label="Companies" value="1100" icon="CO"/><Stat label="Applied" value={applied} icon="AP"/></div><div className="toolList">{tools.map(([t,d,l])=><Card key={t} title={t} subtitle={d} action={<Link className="btn" to={l}>Open Tool</Link>}/>)}</div><Card title="Quick Resources"><div className="resourceGrid">{resources.map(([t,l])=><a className="btn ghost" key={t} href={l} target="_blank" rel="noreferrer">{t}</a>)}</div></Card></Page></Layout>;
 }
 
 function getImportantKeywords(text) {
