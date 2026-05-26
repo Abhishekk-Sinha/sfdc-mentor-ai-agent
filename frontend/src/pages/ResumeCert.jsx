@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Card, Field, Hero, Layout, Page, Progress } from '../components/UI';
 import { cvSkills, profile } from '../data/profile';
 import { readStore, writeStore, downloadText } from '../utils/storage';
@@ -12,3 +12,4 @@ export function Certifications() {
   const [items,setItems]=React.useState(()=>readStore('certs',['Administrator','Platform App Builder','Platform Developer I','AI Associate','Agentforce Specialist'].map(x=>({name:x,progress:0,target:'',notes:''})))); const update=(i,patch)=>{const n=items.map((x,j)=>j===i?{...x,...patch}:x);setItems(n);writeStore('certs',n)};
   return <Layout><Page><Hero title="Certification & Trailhead Tracker" subtitle="Admin, App Builder, PD1, AI Associate, Agentforce Specialist."/><div className="listGap">{items.map((c,i)=><Card key={c.name} title={c.name}><Progress value={c.progress}/><div className="filterBar"><input type="number" value={c.progress} onChange={e=>update(i,{progress:Number(e.target.value)})}/><input value={c.target} onChange={e=>update(i,{target:e.target.value})} placeholder="Target date"/></div><textarea value={c.notes} onChange={e=>update(i,{notes:e.target.value})} placeholder="Modules, badges, notes"/></Card>)}</div></Page></Layout>;
 }
+

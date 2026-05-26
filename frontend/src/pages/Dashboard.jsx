@@ -1,9 +1,9 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link } from 'react-router-dom';
 import { companies } from '../data/companies';
 import { roadmap90 } from '../data/roadmap';
 import { Layout, Page, Card, Stat, Progress } from '../components/UI';
-import { readStore } from '../utils/storage';
+import { readStore, writeStore } from '../utils/storage';
 import { DASHBOARD_HERO_ACTIONS, PREMIUM_PATH_STEPS, QUICK_START_CARDS, TOOL_GROUPS } from '../config/dashboardConfig';
 
 // Counts all meaningful saved answers across mentor, practice, focus and interview modules.
@@ -57,7 +57,7 @@ function MomentumGraph({ score, savedAnswers, strong, applied }) {
   const values = [25, Math.min(100, 25 + savedAnswers * 4), Math.min(100, 35 + strong * 8), Math.min(100, 45 + applied * 6), score];
   const points = values.map((value, index) => `${20 + index * 55},${120 - value}`).join(' ');
   return <div className="momentumGraphCard">
-    <div className="momentumGraphHead"><div><b>Learning Momentum</b><span>Real progress trend</span></div><strong>{score}%</strong></div>
+    <div className="momentumGraphHead"><div><b>Learning Momentum</b><span>Live trend from saved answers, tasks, strong topics and jobs</span></div><strong>{score}%</strong></div>
     <svg viewBox="0 0 260 135" role="img" aria-label="Learning momentum graph">
       <defs><linearGradient id="momentumLine" x1="0" x2="1"><stop offset="0%" stopColor="#35d4ef"/><stop offset="55%" stopColor="#22c55e"/><stop offset="100%" stopColor="#7c3aed"/></linearGradient></defs>
       <path d="M20 25 H240 M20 55 H240 M20 85 H240 M20 115 H240" className="graphGrid"/>
@@ -108,7 +108,7 @@ function QuickStartCard() {
 
 function PremiumHomeGrid({ activeDay, today, score, weak, strong }) {
   return <div className="premiumHomeGrid">
-    <Card title="Today Task" subtitle="Start with the most useful action."><div className="homeFocusCard"><span>🎯</span><b>Day {activeDay}: {today.salesforce}</b><p>Complete one practice set, save one answer, and track one proof item today.</p><Link className="btn cyan" to="/practice">Start Question Bank</Link></div></Card>
+    <Card title="Today Task" subtitle="Start with the most useful action."><div className="homeFocusCard"><span>ðŸŽ¯</span><b>Day {activeDay}: {today.salesforce}</b><p>Complete one practice set, save one answer, and track one proof item today.</p><Link className="btn cyan" to="/practice">Start Question Bank</Link></div></Card>
     <Card title="Job Ready Score" subtitle="Based on saved work."><div className="homeScoreBlock"><b>{score}%</b><Progress value={score}/><p>Score increases when you save answers, complete tasks, mark strong topics and track jobs.</p></div></Card>
     <Card title="Weak Topics" subtitle="Fix these first."><div className="homeMetricLine"><b>{weak}</b><span>Weak marked</span></div><div className="homeMetricLine"><b>{strong}</b><span>Strong marked</span></div><Link className="btn ghost" to="/focus">Open Focus Practice</Link></Card>
     <QuickStartCard />
@@ -117,14 +117,14 @@ function PremiumHomeGrid({ activeDay, today, score, weak, strong }) {
 
 function DashboardStats({ activeDay, today, completedTasks, totalTasks, savedAnswers, applied, strong, weak, weeklyResults, routeDoneToday }) {
   return <div className="statsGrid premiumStatsGrid">
-    <Stat icon="📅" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce}`}/>
-    <Stat icon="✅" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
-    <Stat icon="📝" label="Saved Answers" value={savedAnswers} note="Mentor + Practice + Interview"/>
-    <Stat icon="💼" label="Applied" value={applied} note="Job pipeline"/>
-    <Stat icon="💪" label="Strong Topics" value={strong} note="Based on markings"/>
-    <Stat icon="⚠️" label="Weak Topics" value={weak} note="Plan revision"/>
-    <Stat icon="🧪" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Saved results"/>
-    <Stat icon="🧭" label="Route Done" value={`${routeDoneToday}/6`} note={`Day ${activeDay} tasks`}/>
+    <Stat icon="ðŸ“…" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce}`}/>
+    <Stat icon="âœ…" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
+    <Stat icon="ðŸ“" label="Saved Answers" value={savedAnswers} note="Mentor + Practice + Interview"/>
+    <Stat icon="ðŸ’¼" label="Applied" value={applied} note="Job pipeline"/>
+    <Stat icon="ðŸ’ª" label="Strong Topics" value={strong} note="Based on markings"/>
+    <Stat icon="âš ï¸" label="Weak Topics" value={weak} note="Plan revision"/>
+    <Stat icon="ðŸ§ª" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Saved results"/>
+    <Stat icon="ðŸ§­" label="Route Done" value={`${routeDoneToday}/6`} note={`Day ${activeDay} tasks`}/>
   </div>;
 }
 
@@ -136,6 +136,56 @@ function DashboardDeepGrid({ today, totalTasks, completedTasks, savedAnswers, st
   </div>;
 }
 
+
+function LearningCalendar({ activeDay, today, weak }) {
+  const [startDate, setStartDate] = React.useState(() => readStore('learningStartDate', ''));
+  const notes = readStore('learningCalendarNotes', {});
+  const [selectedDay, setSelectedDay] = React.useState(activeDay);
+  const [note, setNote] = React.useState(notes[activeDay] || '');
+  const days = Array.from({ length: 14 }, (_, i) => Math.max(1, activeDay - 3 + i)).filter(day => day <= 90);
+
+  const saveStartDate = () => {
+    writeStore('learningStartDate', startDate);
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const saveDayNote = () => {
+    const next = readStore('learningCalendarNotes', {});
+    next[selectedDay] = note;
+    writeStore('learningCalendarNotes', next);
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  return <Card title="Learning Calendar" subtitle="Save your Day 1 date and write notes for missed or gap days.">
+    <div className="learningCalendarPro">
+      <div className="calendarStartRow">
+        <label><span>Day 1 Start Date</span><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></label>
+        <button className="btn cyan" onClick={saveStartDate}>Save Start</button>
+      </div>
+      <div className="calendarDayGrid">
+        {days.map(day => <button key={day} className={day === selectedDay ? 'active' : ''} onClick={() => { setSelectedDay(day); setNote(readStore('learningCalendarNotes', {})[day] || ''); }}>
+          <b>Day {day}</b><small>{day === activeDay ? 'Today' : readStore('learningCalendarNotes', {})[day] ? 'Note saved' : 'Plan'}</small>
+        </button>)}
+      </div>
+      <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Write gap reason, revision note, or recovery plan..." />
+      <button className="btn ghost" onClick={saveDayNote}>Save Day Note</button>
+    </div>
+  </Card>;
+}
+
+function DailyNotifications({ activeDay, today, weak }) {
+  const notifications = [
+    `Day ${activeDay}: Learn ${today.salesforce}`,
+    `Practice: ${today.dsa}`,
+    `System Design: ${today.systemDesign}`,
+    weak > 0 ? `Revision: Fix ${weak} weak topic(s)` : 'Revision: Mark one topic Weak or Strong',
+    'Proof: Save one answer and track one focused sprint'
+  ];
+  return <Card title="Today Notifications" subtitle="Day-wise guidance so you know what to study today.">
+    <div className="notificationStack">{notifications.map((item, index) => <div key={item}><b>{String(index + 1).padStart(2, '0')}</b><span>{item}</span></div>)}</div>
+  </Card>;
+}
+
 function ToolsByPurpose() {
   return <Card title="Tools Grouped by Purpose" subtitle="Clean final flow. Choose the group based on what you want to do now.">
     <div className="grid2">{TOOL_GROUPS.map(group => <div className="previewCard" key={group.title}><h3>{group.title}</h3><div className="toolGrid compactToolGrid">{group.items.map(item => <Link key={item.label} className="toolTile" to={item.to}><b>{item.icon} {item.label}</b><span>Open</span></Link>)}</div></div>)}</div>
@@ -143,13 +193,22 @@ function ToolsByPurpose() {
 }
 
 export function Dashboard() {
+  const [refreshTick, setRefreshTick] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => setRefreshTick(t => t + 1), 5000);
+    const onStorage = () => setRefreshTick(t => t + 1);
+    window.addEventListener('storage', onStorage);
+    return () => { clearInterval(id); window.removeEventListener('storage', onStorage); };
+  }, []);
   const data = useDashboardData();
-  return <Layout><Page>
+  return <Layout><Page data-refresh={refreshTick}>
     <DashboardHero {...data} />
     <PremiumCommandStrip />
+    <div className="grid2"><LearningCalendar {...data} /><DailyNotifications {...data} /></div>
     <PremiumHomeGrid {...data} />
     <DashboardStats {...data} />
     <DashboardDeepGrid {...data} />
     <ToolsByPurpose />
   </Page></Layout>;
 }
+
