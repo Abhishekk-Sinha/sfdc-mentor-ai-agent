@@ -8,7 +8,8 @@ import { downloadText, readStore, writeStore } from '../utils/storage';
 
 const profileKeywords = [
   'Salesforce Developer', 'Apex', 'Apex Trigger', 'LWC', 'Flow', 'SOQL', 'REST API',
-  'Salesforce Admin', 'Lightning Web Components', 'Integration', 'Security', 'Reports', 'CRM'
+  'Salesforce Admin', 'Lightning Web Components', 'Integration', 'Security', 'Reports', 'CRM',
+  'Einstein AI', 'Agentforce', 'Sales Cloud', 'Service Cloud'
 ];
 
 function applySearch(companyName = '', role = 'Salesforce Developer', location = 'India / Remote') {
@@ -43,6 +44,10 @@ function copyText(text) {
   return navigator.clipboard?.writeText(text).catch(() => {});
 }
 
+function cleanRoleText(value = '') {
+  return String(value).split(',').map(item => item.trim()).filter(Boolean);
+}
+
 export function JobTracker() {
   const [rows,setRows]=React.useState(()=>normalizeJobs(readStore('jobs',companies)));
   const [filter,setFilter]=React.useState({q:'',status:'All'});
@@ -56,6 +61,14 @@ export function JobTracker() {
   const appliedCount = rows.filter(r => r.applied || r.status === 'Applied').length;
   const savedCount = rows.filter(r => r.saved || r.status === 'Saved').length;
   const activeCount = rows.filter(r => ['Applied','HR Call','Technical','Offer'].includes(r.status)).length;
+
+  const addKeywordToRole = (keyword) => {
+    const parts = cleanRoleText(applyRole);
+    const exists = parts.some(item => item.toLowerCase() === keyword.toLowerCase());
+    const next = exists ? parts.join(', ') : [...parts, keyword].join(', ');
+    setApplyRole(next);
+    writeStore('applyRole', next);
+  };
 
   const queueTop=()=>{
     const ids=recommended.slice(0,8).map(r=>r.id);
@@ -73,12 +86,12 @@ export function JobTracker() {
       <Stat label="Active Pipeline" value={activeCount} icon="IN" note="Interview process"/>
     </div>
 
-    <Card title="Profile-Based Apply Assistant" subtitle="Creates a focused queue from your Salesforce profile. Company name opens Salesforce Developer career search directly.">
+    <Card title="Profile-Based Apply Assistant" subtitle="Click any skill chip to add it into Target Role, then click company name in the table to open career search.">
       <div className="autoApplyPanel">
         <div className="grid2"><Field label="Target Role" value={applyRole} onChange={setApplyRole}/><Field label="Location" value={applyLocation} onChange={setApplyLocation}/></div>
-        <div className="professionalBadgeRow">{profileKeywords.map(k=><span key={k}>{k}</span>)}</div>
+        <div className="professionalBadgeRow">{profileKeywords.map(k=><button type="button" className="skillChipButton" key={k} onClick={()=>addKeywordToRole(k)} title={`Add ${k} to Target Role`}>{k}</button>)}</div>
         <div className="row"><button className="btn cyan" onClick={()=>{saveApplySettings();queueTop();}}>Generate Apply Queue</button><button className="btn ghost" onClick={saveApplySettings}>Save Target</button><a className="btn ghost" href={`https://www.google.com/search?q=${encodeURIComponent(`${applyRole} ${applyLocation} Salesforce Apex LWC jobs`)}`} target="_blank" rel="noreferrer">Open Job Search</a></div>
-        <p className="hint">Best Matching Companies panel removed. Use the company table below; clicking only the company name opens that company&apos;s Salesforce Developer career search.</p>
+        <p className="hint">Example: click Einstein AI or Agentforce and it will be added to Target Role automatically. Company table below shows only company names.</p>
       </div>
     </Card>
 
