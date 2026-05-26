@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { companies } from '../data/companies';
 import { roadmap90 } from '../data/roadmap';
@@ -30,7 +30,15 @@ function calculateJobReadyScore({ tasks = [], savedAnswers = 0, weakStrong = {},
 
 function getActiveDay() {
   const explicitDay = Number(readStore('mentorDay', 0)) || Number(readStore('focusDay', 0)) || Number(readStore('timeCurrentDay', 0));
-  return explicitDay ? Math.max(1, Math.min(90, explicitDay)) : 1;
+  if (explicitDay) return Math.max(1, Math.min(90, explicitDay));
+  const startDate = readStore('learningStartDate', '');
+  if (startDate) {
+    const today = new Date();
+    const start = new Date(startDate);
+    const diff = Math.floor((today.setHours(0, 0, 0, 0) - start.setHours(0, 0, 0, 0)) / 86400000) + 1;
+    return Math.max(1, Math.min(90, diff));
+  }
+  return 1;
 }
 
 function useDashboardData() {
@@ -53,22 +61,27 @@ function useDashboardData() {
   return { activeDay, today, score, savedAnswers, strong, weak, applied, completedTasks, totalTasks, routeDoneToday, weeklyResults };
 }
 
-function MomentumGraph({ score, savedAnswers, strong, applied }) {
-  const values = [25, Math.min(100, 25 + savedAnswers * 4), Math.min(100, 35 + strong * 8), Math.min(100, 45 + applied * 6), score];
-  const points = values.map((value, index) => `${20 + index * 55},${120 - value}`).join(' ');
+function MomentumGraph({ score, savedAnswers, strong, applied, completedTasks = 0, totalTasks = 0, routeDoneToday = 0, weeklyResults = {} }) {
+  const practiceScore = Math.min(100, 25 + savedAnswers * 4);
+  const strengthScore = Math.min(100, 35 + strong * 8);
+  const workScore = Math.min(100, 40 + (totalTasks ? completedTasks / Math.max(totalTasks, 1) * 35 : 0) + routeDoneToday * 5);
+  const careerScore = Math.min(100, 45 + applied * 6 + Object.keys(weeklyResults || {}).length * 3);
+  const values = [25, practiceScore, strengthScore, workScore, careerScore, score];
+  const labels = ['Start', 'Practice', 'Strong', 'Work', 'Career', 'Ready'];
+  const points = values.map((value, index) => `${18 + index * 44},${120 - value}`).join(' ');
   return <div className="momentumGraphCard">
     <div className="momentumGraphHead"><div><b>Learning Momentum</b><span>Live trend from saved answers, tasks, strong topics and jobs</span></div><strong>{score}%</strong></div>
     <svg viewBox="0 0 260 135" role="img" aria-label="Learning momentum graph">
       <defs><linearGradient id="momentumLine" x1="0" x2="1"><stop offset="0%" stopColor="#35d4ef"/><stop offset="55%" stopColor="#22c55e"/><stop offset="100%" stopColor="#7c3aed"/></linearGradient></defs>
-      <path d="M20 25 H240 M20 55 H240 M20 85 H240 M20 115 H240" className="graphGrid"/>
+      <path d="M18 25 H238 M18 55 H238 M18 85 H238 M18 115 H238" className="graphGrid"/>
       <polyline points={points} className="graphLine"/>
-      {values.map((value, index) => <circle key={index} cx={20 + index * 55} cy={120 - value} r="5.5" className="graphDot"/>)}
+      {values.map((value, index) => <circle key={index} cx={18 + index * 44} cy={120 - value} r="5.5" className="graphDot"/>)}
     </svg>
-    <div className="momentumLegend"><span>Start</span><span>Answers</span><span>Strong</span><span>Jobs</span><span>Ready</span></div>
+    <div className="momentumLegend">{labels.map(label => <span key={label}>{label}</span>)}</div>
   </div>;
 }
 
-function DashboardHero({ score, activeDay, savedAnswers, strong, applied }) {
+function DashboardHero({ score, activeDay, savedAnswers, strong, applied, completedTasks, totalTasks, routeDoneToday, weeklyResults }) {
   const heroStats = [
     { label: 'Day', value: `Day ${activeDay}` },
     { label: 'Saved', value: savedAnswers },
@@ -79,14 +92,14 @@ function DashboardHero({ score, activeDay, savedAnswers, strong, applied }) {
     <div className="dashboardHeroContent">
       <p className="eyebrow">SFDC Mentor Career OS</p>
       <h1>Home Guide</h1>
-      <p>Your premium control room for practice, AI guidance, interview preparation, job tracking and daily proof.</p>
+      <p>Your professional command center for practice, AI guidance, interview preparation, job tracking and daily proof.</p>
       <div className="dashboardHeroActions">
         {DASHBOARD_HERO_ACTIONS.map(action => <Link key={action.label} className={action.className} to={action.to}>{action.label}</Link>)}
       </div>
     </div>
     <div className="dashboardScorePanel">
       <div className="scoreCircle"><b>{score}%</b><span>Job Ready</span></div>
-      <MomentumGraph score={score} savedAnswers={savedAnswers} strong={strong} applied={applied} />
+      <MomentumGraph score={score} savedAnswers={savedAnswers} strong={strong} applied={applied} completedTasks={completedTasks} totalTasks={totalTasks} routeDoneToday={routeDoneToday} weeklyResults={weeklyResults} />
       <div className="heroMiniStats">{heroStats.map(item => <div key={item.label}><b>{item.value}</b><span>{item.label}</span></div>)}</div>
     </div>
   </section>;
@@ -108,7 +121,7 @@ function QuickStartCard() {
 
 function PremiumHomeGrid({ activeDay, today, score, weak, strong }) {
   return <div className="premiumHomeGrid">
-    <Card title="Today Task" subtitle="Start with the most useful action."><div className="homeFocusCard"><span>ðŸŽ¯</span><b>Day {activeDay}: {today.salesforce}</b><p>Complete one practice set, save one answer, and track one proof item today.</p><Link className="btn cyan" to="/practice">Start Question Bank</Link></div></Card>
+    <Card title="Today Task" subtitle="Start with the most useful action."><div className="homeFocusCard"><span>GO</span><b>Day {activeDay}: {today.salesforce}</b><p>Complete one practice set, save one answer, and track one proof item today.</p><Link className="btn cyan" to="/practice">Start Question Bank</Link></div></Card>
     <Card title="Job Ready Score" subtitle="Based on saved work."><div className="homeScoreBlock"><b>{score}%</b><Progress value={score}/><p>Score increases when you save answers, complete tasks, mark strong topics and track jobs.</p></div></Card>
     <Card title="Weak Topics" subtitle="Fix these first."><div className="homeMetricLine"><b>{weak}</b><span>Weak marked</span></div><div className="homeMetricLine"><b>{strong}</b><span>Strong marked</span></div><Link className="btn ghost" to="/focus">Open Focus Practice</Link></Card>
     <QuickStartCard />
@@ -116,15 +129,15 @@ function PremiumHomeGrid({ activeDay, today, score, weak, strong }) {
 }
 
 function DashboardStats({ activeDay, today, completedTasks, totalTasks, savedAnswers, applied, strong, weak, weeklyResults, routeDoneToday }) {
-  return <div className="statsGrid premiumStatsGrid">
-    <Stat icon="ðŸ“…" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce}`}/>
-    <Stat icon="âœ…" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
-    <Stat icon="ðŸ“" label="Saved Answers" value={savedAnswers} note="Mentor + Practice + Interview"/>
-    <Stat icon="ðŸ’¼" label="Applied" value={applied} note="Job pipeline"/>
-    <Stat icon="ðŸ’ª" label="Strong Topics" value={strong} note="Based on markings"/>
-    <Stat icon="âš ï¸" label="Weak Topics" value={weak} note="Plan revision"/>
-    <Stat icon="ðŸ§ª" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Saved results"/>
-    <Stat icon="ðŸ§­" label="Route Done" value={`${routeDoneToday}/6`} note={`Day ${activeDay} tasks`}/>
+  return <div className="statsGrid premiumStatsGrid dashboardCleanStats">
+    <Stat icon="DAY" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce}`}/>
+    <Stat icon="DONE" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
+    <Stat icon="ANS" label="Saved Answers" value={savedAnswers} note="Mentor + Practice + Interview"/>
+    <Stat icon="JOB" label="Applied" value={applied} note="Job pipeline"/>
+    <Stat icon="STR" label="Strong Topics" value={strong} note="Based on markings"/>
+    <Stat icon="WEAK" label="Weak Topics" value={weak} note="Plan revision"/>
+    <Stat icon="TEST" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Saved results"/>
+    <Stat icon="PLAN" label="Route Done" value={`${routeDoneToday}/6`} note={`Day ${activeDay} tasks`}/>
   </div>;
 }
 
@@ -136,8 +149,7 @@ function DashboardDeepGrid({ today, totalTasks, completedTasks, savedAnswers, st
   </div>;
 }
 
-
-function LearningCalendar({ activeDay, today, weak }) {
+function LearningCalendar({ activeDay }) {
   const [startDate, setStartDate] = React.useState(() => readStore('learningStartDate', ''));
   const notes = readStore('learningCalendarNotes', {});
   const [selectedDay, setSelectedDay] = React.useState(activeDay);
@@ -211,4 +223,3 @@ export function Dashboard() {
     <ToolsByPurpose />
   </Page></Layout>;
 }
-
