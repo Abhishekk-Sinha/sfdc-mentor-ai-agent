@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { companies } from '../data/companies';
 import { roadmap90 } from '../data/roadmap';
 import { Layout, Page, Card, Stat, Progress } from '../components/UI';
+import { DashboardProfessionalSuite } from '../components/ProfessionalAddons';
 import { readStore, writeStore } from '../utils/storage';
 import { DASHBOARD_HERO_ACTIONS, PREMIUM_PATH_STEPS, QUICK_START_CARDS, TOOL_GROUPS } from '../config/dashboardConfig';
 
@@ -216,6 +217,7 @@ export function Dashboard() {
   return <Layout><Page data-refresh={refreshTick}>
     <DashboardHero {...data} />
     <PremiumCommandStrip />
+    <DashboardProfessionalSuite />
     <div className="grid2"><LearningCalendar {...data} /><DailyNotifications {...data} /></div>
     <PremiumHomeGrid {...data} />
     <DashboardStats {...data} />
