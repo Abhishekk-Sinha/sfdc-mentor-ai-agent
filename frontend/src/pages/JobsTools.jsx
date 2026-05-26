@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Field, Hero, Layout, Page, Stat, Progress } from '../components/UI';
+import { Card, Field, Hero, Layout, Page, Stat } from '../components/UI';
 import { companies, jobPortals } from '../data/companies';
 import { profile, cvSkills } from '../data/profile';
 import { keywordMatch } from '../utils/scoring';
@@ -30,7 +30,7 @@ function normalizeJobs(rows = []) {
   return rows.map((row, index) => ({
     id: row.id || index + 1,
     name: row.name || `Company ${index + 1}`,
-    website: row.website || applySearch(row.name || ''),
+    website: row.website || '',
     status: row.status || 'Saved',
     saved: Boolean(row.saved),
     applied: Boolean(row.applied),
@@ -59,13 +59,13 @@ export function JobTracker() {
 
   const queueTop=()=>{
     const ids=recommended.slice(0,8).map(r=>r.id);
-    const n=rows.map(r=>ids.includes(r.id)?{...r,saved:true,status:r.status||'Saved',notes:r.notes || `Profile match: ${applyRole} - ${applyLocation}. Next action: open career page, verify JD, customize resume, apply manually, and add follow-up date.`}:r);
+    const n=rows.map(r=>ids.includes(r.id)?{...r,saved:true,status:r.status||'Saved',notes:r.notes || `Profile match: ${applyRole} - ${applyLocation}. Next action: click company name, open Salesforce Developer career search, verify JD, customize resume, apply manually, and add follow-up date.`}:r);
     setRows(n); writeStore('jobs',n); setSelected(ids);
   };
   const saveApplySettings=()=>{writeStore('applyRole',applyRole);writeStore('applyLocation',applyLocation)};
   const copyNote=(name)=>copyText(professionalApplyNote(name));
 
-  return <Layout><Page><Hero title="Job Tracker" subtitle="Professional Salesforce job pipeline with focused apply queue, company research, notes and follow-up tracking."/>
+  return <Layout><Page><Hero title="Job Tracker" subtitle="Professional Salesforce job pipeline with focused apply queue, company career links, notes and follow-up tracking."/>
     <div className="statsGrid premiumStatsGrid">
       <Stat label="Total Companies" value={rows.length} icon="CO" note="Tracked list"/>
       <Stat label="Saved" value={savedCount} icon="SV" note="Shortlisted"/>
@@ -73,21 +73,18 @@ export function JobTracker() {
       <Stat label="Active Pipeline" value={activeCount} icon="IN" note="Interview process"/>
     </div>
 
-    <div className="grid2">
-      <Card title="Profile-Based Apply Assistant" subtitle="Creates a focused queue from your Salesforce profile. It prepares links and notes; final submission stays manual.">
-        <div className="autoApplyPanel">
-          <div className="grid2"><Field label="Target Role" value={applyRole} onChange={setApplyRole}/><Field label="Location" value={applyLocation} onChange={setApplyLocation}/></div>
-          <div className="professionalBadgeRow">{profileKeywords.map(k=><span key={k}>{k}</span>)}</div>
-          <div className="row"><button className="btn cyan" onClick={()=>{saveApplySettings();queueTop();}}>Generate Apply Queue</button><button className="btn ghost" onClick={saveApplySettings}>Save Target</button><a className="btn ghost" href={`https://www.google.com/search?q=${encodeURIComponent(`${applyRole} ${applyLocation} Salesforce Apex LWC jobs`)}`} target="_blank" rel="noreferrer">Open Job Search</a></div>
-          <p className="hint">This assistant avoids unsafe auto-submit. It prepares the best queue, career links, notes and application text so you can review and apply accurately.</p>
-        </div>
-      </Card>
-      <Card title="Best Matching Companies" subtitle="Start with these companies for focused applications."><div className="applyQueueList">{recommended.slice(0,6).map(r=><div key={r.id} className="applyCompanyCard"><div><b>{r.name}</b><span>{r.fit}% fit</span></div><div className="row"><a className="btn small ghost" href={applySearch(r.name, applyRole, applyLocation)} target="_blank" rel="noreferrer">Search Jobs</a><button className="btn small" onClick={()=>copyNote(r.name)}>Copy Note</button><button className="btn small cyan" onClick={()=>update(r.id,{saved:true,status:'Saved',notes:r.notes || professionalApplyNote(r.name)})}>Save</button></div></div>)}</div></Card>
-    </div>
+    <Card title="Profile-Based Apply Assistant" subtitle="Creates a focused queue from your Salesforce profile. Company name opens Salesforce Developer career search directly.">
+      <div className="autoApplyPanel">
+        <div className="grid2"><Field label="Target Role" value={applyRole} onChange={setApplyRole}/><Field label="Location" value={applyLocation} onChange={setApplyLocation}/></div>
+        <div className="professionalBadgeRow">{profileKeywords.map(k=><span key={k}>{k}</span>)}</div>
+        <div className="row"><button className="btn cyan" onClick={()=>{saveApplySettings();queueTop();}}>Generate Apply Queue</button><button className="btn ghost" onClick={saveApplySettings}>Save Target</button><a className="btn ghost" href={`https://www.google.com/search?q=${encodeURIComponent(`${applyRole} ${applyLocation} Salesforce Apex LWC jobs`)}`} target="_blank" rel="noreferrer">Open Job Search</a></div>
+        <p className="hint">Best Matching Companies panel removed. Use the company table below; clicking the company name opens that company&apos;s Salesforce Developer career search.</p>
+      </div>
+    </Card>
 
     <Card title="Filters & Bulk Actions"><div className="filterBar"><input value={filter.q} onChange={e=>setFilter({...filter,q:e.target.value})} placeholder="Search company"/><select value={filter.status} onChange={e=>setFilter({...filter,status:e.target.value})}>{['All','Saved','Applied','HR Call','Technical','Offer','Rejected'].map(x=><option key={x}>{x}</option>)}</select><button className="btn" onClick={()=>{const n=rows.map(r=>selected.includes(r.id)?{...r,status:'Applied',applied:true}:r);setRows(n);writeStore('jobs',n)}}>Bulk Applied</button><button className="btn ghost" onClick={()=>downloadText('job-tracker.json',JSON.stringify(rows,null,2),'application/json')}>Export</button></div></Card>
 
-    <div className="tableWrap professionalJobTable"><table><thead><tr><th><input type="checkbox" onChange={e=>setSelected(e.target.checked?list.map(x=>x.id):[])}/></th><th>No.</th><th>Company</th><th>Status</th><th>Checklist</th><th className="notesTh">Notes / Follow-up Details</th></tr></thead><tbody>{list.map(r=><tr key={r.id}><td><input type="checkbox" checked={selected.includes(r.id)} onChange={e=>setSelected(e.target.checked?[...selected,r.id]:selected.filter(x=>x!==r.id))}/></td><td><span className="numBox">{r.id}</span></td><td><div className="companyCell"><a href={r.website} target="_blank" rel="noreferrer"><b>{r.name}</b><small>{r.website}</small></a><div className="row"><a className="btn small ghost" href={applySearch(r.name, applyRole, applyLocation)} target="_blank" rel="noreferrer">Career Search</a><button className="btn small ghost" onClick={()=>copyNote(r.name)}>Copy Apply Note</button></div></div></td><td><select value={r.status} onChange={e=>update(r.id,{status:e.target.value,applied:e.target.value==='Applied'})}>{['Saved','Applied','HR Call','Technical','Offer','Rejected'].map(x=><option key={x}>{x}</option>)}</select></td><td><label className="checkPill"><input type="checkbox" checked={r.saved} onChange={e=>update(r.id,{saved:e.target.checked})}/> Saved</label><label className="checkPill"><input type="checkbox" checked={r.applied} onChange={e=>update(r.id,{applied:e.target.checked,status:e.target.checked?'Applied':r.status})}/> Applied</label></td><td className="jobNotesCell"><textarea className="jobNoteArea" value={r.notes} onChange={e=>update(r.id,{notes:e.target.value})} placeholder="Applied link, recruiter name, follow-up date, JD keywords, interview notes..."/><div className="row"><button className="btn small cyan" onClick={()=>update(r.id,{notes:r.notes, noteSavedAt:new Date().toLocaleString()})}>Save Note</button><small>{r.noteSavedAt}</small></div></td></tr>)}</tbody></table></div><p className="hint">All changes save locally and can sync to SQLite when backend is running. Use Backup Center regularly.</p></Page></Layout>;
+    <div className="tableWrap professionalJobTable"><table><thead><tr><th><input type="checkbox" onChange={e=>setSelected(e.target.checked?list.map(x=>x.id):[])}/></th><th>No.</th><th>Company</th><th>Status</th><th>Checklist</th><th className="notesTh">Notes / Follow-up Details</th></tr></thead><tbody>{list.map(r=><tr key={r.id}><td><input type="checkbox" checked={selected.includes(r.id)} onChange={e=>setSelected(e.target.checked?[...selected,r.id]:selected.filter(x=>x!==r.id))}/></td><td><span className="numBox">{r.id}</span></td><td><div className="companyCell"><a className="companyCareerLink" href={applySearch(r.name, applyRole, applyLocation)} target="_blank" rel="noreferrer"><b>{r.name}</b><small>{applyRole} careers - click to open</small></a><div className="row"><button className="btn small ghost" onClick={()=>copyNote(r.name)}>Copy Apply Note</button>{r.website && <a className="btn small ghost" href={r.website} target="_blank" rel="noreferrer">Company Site</a>}</div></div></td><td><select value={r.status} onChange={e=>update(r.id,{status:e.target.value,applied:e.target.value==='Applied'})}>{['Saved','Applied','HR Call','Technical','Offer','Rejected'].map(x=><option key={x}>{x}</option>)}</select></td><td><label className="checkPill"><input type="checkbox" checked={r.saved} onChange={e=>update(r.id,{saved:e.target.checked})}/> Saved</label><label className="checkPill"><input type="checkbox" checked={r.applied} onChange={e=>update(r.id,{applied:e.target.checked,status:e.target.checked?'Applied':r.status})}/> Applied</label></td><td className="jobNotesCell"><textarea className="jobNoteArea" value={r.notes} onChange={e=>update(r.id,{notes:e.target.value})} placeholder="Applied link, recruiter name, follow-up date, JD keywords, interview notes..."/><div className="row"><button className="btn small cyan" onClick={()=>update(r.id,{notes:r.notes, noteSavedAt:new Date().toLocaleString()})}>Save Note</button><small>{r.noteSavedAt}</small></div></td></tr>)}</tbody></table></div><p className="hint">All changes save locally and can sync to SQLite when backend is running. Use Backup Center regularly.</p></Page></Layout>;
 }
 
 export function MoreTools() {
