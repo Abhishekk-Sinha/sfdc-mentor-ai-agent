@@ -104,14 +104,12 @@ export function Login() {
   const [otpSent, setOtpSent] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [status, setStatus] = React.useState('');
-  const [devOtp, setDevOtp] = React.useState('');
   const [form, setForm] = React.useState({ name: '', email: profile.email || '', mobile: '', password: '', otp: '', newPassword: '' });
 
   const setValue = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
   const switchMode = nextMode => {
     setMode(nextMode);
     setStatus('');
-    setDevOtp('');
     setOtpSent(false);
     setForm(prev => ({ ...prev, otp: '', newPassword: '' }));
   };
@@ -136,7 +134,6 @@ export function Login() {
   const requestOtp = async () => {
     setBusy(true);
     setStatus('');
-    setDevOtp('');
     try {
       const data = await apiPost('/api/auth/request-signup-otp', {
         name: form.name,
@@ -145,8 +142,7 @@ export function Login() {
         password: form.password
       });
       setOtpSent(true);
-      setDevOtp(data.dev_otp || '');
-      setStatus(data.message || 'OTP sent to your email.');
+      setStatus(data.email_sent === false ? 'OTP could not be emailed. Please check backend email provider settings.' : (data.message || 'OTP sent to your email.'));
     } catch (err) {
       setStatus(err.message || 'Could not send OTP.');
     } finally {
@@ -170,12 +166,10 @@ export function Login() {
   const forgotPassword = async () => {
     setBusy(true);
     setStatus('');
-    setDevOtp('');
     try {
       const data = await apiPost('/api/auth/forgot-password', { email: form.email });
       setOtpSent(true);
-      setDevOtp(data.dev_otp || '');
-      setStatus(data.message || 'Password reset OTP sent to your email.');
+      setStatus(data.email_sent === false ? 'Reset OTP could not be emailed. Please check backend email provider settings.' : (data.message || 'Password reset OTP sent to your email.'));
     } catch (err) {
       setStatus(err.message || 'Could not send password reset OTP.');
     } finally {
@@ -190,7 +184,6 @@ export function Login() {
       const data = await apiPost('/api/auth/reset-password', { email: form.email, otp: form.otp, new_password: form.newPassword });
       setStatus(data.message || 'Password reset successful. Please login.');
       setForm(prev => ({ ...prev, password: '', otp: '', newPassword: '' }));
-      setDevOtp('');
       setOtpSent(false);
       setMode('login');
     } catch (err) {
@@ -233,7 +226,6 @@ export function Login() {
         <label className="field"><span>New Password *</span><div className="passwordField"><input type={show ? 'text' : 'password'} value={form.newPassword} onChange={e => setValue('newPassword', e.target.value)} placeholder="Minimum 6 characters"/><button type="button" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button></div></label>
       </>}
       {isSignup && otpSent && <Field label="Email OTP *" value={form.otp} onChange={v => setValue('otp', v)} />}
-      {devOtp && <p className="hint">Local testing OTP: <b>{devOtp}</b>. Configure SMTP to send real email.</p>}
       {status && <p className="hint">{status}</p>}
 
       {mode === 'login' && <>
