@@ -18,18 +18,68 @@ const defaultPhoto = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <text x="210" y="386" text-anchor="middle" font-family="Arial" font-size="34" font-weight="800" fill="#fff">AK</text>
 </svg>`)};`;
 
+async function syncPhotoToBackend(photo) {
+  try {
+    await fetch('http://127.0.0.1:8000/api/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'profilePhoto', type: 'profile', title: 'Profile Photo', data: photo })
+    });
+  } catch {
+    // Local app still works without backend.
+  }
+}
+
+async function loadPhotoFromBackend() {
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/items?key=profilePhoto&limit=1');
+    const data = await response.json();
+    const saved = data?.items?.[0]?.payload;
+    if (typeof saved === 'string' && saved.startsWith('data:image')) return saved;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function useProfilePhoto() {
   const [photo, setPhoto] = React.useState(() => readStore('profilePhoto', defaultPhoto));
+  const [status, setStatus] = React.useState('Saved in browser');
+
+  React.useEffect(() => {
+    let active = true;
+    loadPhotoFromBackend().then(saved => {
+      if (!active || !saved) return;
+      setPhoto(saved);
+      writeStore('profilePhoto', saved);
+      setStatus('Saved in browser + SQLite');
+    });
+    return () => { active = false; };
+  }, []);
+
   const upload = file => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      setPhoto(reader.result);
-      writeStore('profilePhoto', reader.result);
+      const savedPhoto = reader.result;
+      setPhoto(savedPhoto);
+      writeStore('profilePhoto', savedPhoto);
+      writeStore('profilePhotoSavedAt', new Date().toLocaleString());
+      setStatus('Saved permanently in this browser');
+      syncPhotoToBackend(savedPhoto).then(() => setStatus('Saved in browser + SQLite'));
     };
     reader.readAsDataURL(file);
   };
-  return { photo, upload };
+
+  const reset = () => {
+    setPhoto(defaultPhoto);
+    writeStore('profilePhoto', defaultPhoto);
+    writeStore('profilePhotoSavedAt', new Date().toLocaleString());
+    setStatus('Default photo restored');
+    syncPhotoToBackend(defaultPhoto);
+  };
+
+  return { photo, upload, reset, status };
 }
 
 export function Login() {
@@ -46,7 +96,7 @@ export function Login() {
       <h1>Welcome back, Abhishek</h1>
       <p>Track skills, answers, projects, interviews, jobs and daily proof from one private mentor dashboard.</p>
       <div className="loginProofGrid">
-        <span>⚡ 90-Day Mentor Route</span><span>🎯 Focus Mode</span><span>💼 Job Tracker</span><span>🤖 AI Mentor</span>
+        <span>90-Day Mentor Route</span><span>Focus Mode</span><span>Job Tracker</span><span>AI Mentor</span>
       </div>
     </section>
     <section className="loginCard premiumLoginCard">
@@ -58,7 +108,7 @@ export function Login() {
       <div className="loginOptions"><label><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/> Remember me</label><button type="button">Forgot password?</button></div>
       <button className="btn cyan full" onClick={login}>Enter Dashboard</button>
       <Link className="btn ghost full" to="/portfolio">View Public Job Portfolio</Link>
-      <div className="secureBadges"><span>🔐 Local data</span><span>⚙️ Offline-first</span><span>📦 Backup ready</span></div>
+      <div className="secureBadges"><span>Local data</span><span>Offline-first</span><span>Backup ready</span></div>
     </section>
   </div>;
 }
@@ -77,14 +127,14 @@ export function Portfolio() {
         <h1>{profile.name}</h1>
         <h2>{profile.headline}</h2>
         <p>{profile.summary}</p>
-        <div className="portfolioHeroActions"><a className="btn cyan" href="#skills">View Skills</a><a className="btn ghost" href={profile.linkedin} target="_blank">LinkedIn</a><a className="btn ghost" href={profile.github} target="_blank">GitHub</a><Link className="btn ghost" to="/login">Career OS Login</Link></div>
+        <div className="portfolioHeroActions"><a className="btn cyan" href="#skills">View Skills</a><a className="btn ghost" href={profile.linkedin} target="_blank" rel="noreferrer">LinkedIn</a><a className="btn ghost" href={profile.github} target="_blank" rel="noreferrer">GitHub</a><Link className="btn ghost" to="/login">Career OS Login</Link></div>
         <div className="recruiterStats">{recruiterStats.map(([v,l]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}</div>
       </div>
       <aside className="profileCard premiumProfileCard">
         <div className="profilePhotoRing"><img src={photo} alt="Abhishek Kumar" /></div>
         <h3>{profile.role}</h3>
         <p>{profile.location}</p>
-        <div className="contactStack"><a href={`mailto:${profile.email}`}>{profile.email}</a><a href={`tel:${profile.phone}`}>{profile.phone}</a><a target="_blank" href={profile.trailhead}>Trailhead Profile</a></div>
+        <div className="contactStack"><a href={`mailto:${profile.email}`}>{profile.email}</a><a href={`tel:${profile.phone}`}>{profile.phone}</a><a target="_blank" rel="noreferrer" href={profile.trailhead}>Trailhead Profile</a></div>
         <div className="availabilityCard"><b>Available for</b><span>Salesforce Developer roles • Apex • LWC • Flow • Integration</span></div>
       </aside>
     </section>
@@ -104,11 +154,13 @@ export function Portfolio() {
 }
 
 export function PortfolioManager() {
-  const { photo, upload } = useProfilePhoto();
+  const { photo, upload, reset, status } = useProfilePhoto();
   const [skills, setSkills] = React.useState(() => readStore('portfolioSkills', Object.values(cvSkills).flat()));
   const [newSkill, setNewSkill] = React.useState('');
-  return <Page><Card title="Portfolio Content Manager" subtitle="Update profile photo and portfolio skills.">
-    <div className="managerPhotoRow"><img src={photo} alt="Portfolio profile"/><label className="btn cyan">Upload Profile Photo<input type="file" accept="image/*" onChange={e => upload(e.target.files?.[0])} hidden/></label><Link className="btn ghost" to="/portfolio">Preview Portfolio</Link></div>
+  const savedAt = readStore('profilePhotoSavedAt', 'Not uploaded yet');
+  return <Page><Card title="Portfolio Content Manager" subtitle="Upload profile photo once. It stays saved in browser localStorage and syncs to SQLite when backend is running.">
+    <div className="managerPhotoRow"><img src={photo} alt="Portfolio profile"/><label className="btn cyan">Upload & Save Photo<input type="file" accept="image/*" onChange={e => upload(e.target.files?.[0])} hidden/></label><button className="btn ghost" onClick={reset}>Reset Photo</button><Link className="btn ghost" to="/portfolio">Preview Portfolio</Link></div>
+    <p className="hint">Photo status: {status}. Last saved: {savedAt}. You do not need to upload again unless you clear browser data or change browser/device.</p>
     <div className="row"><input value={newSkill} onChange={e => setNewSkill(e.target.value)} placeholder="Add skill" /><button className="btn" onClick={() => { if(newSkill.trim()){ const next=[...skills,newSkill.trim()]; setSkills(next); writeStore('portfolioSkills', next); setNewSkill(''); } }}>Add</button></div>
     <div className="crudList">{skills.map((s, i) => <div key={i}><input value={s} onChange={e => { const next=skills.map((x,j)=>j===i?e.target.value:x); setSkills(next); writeStore('portfolioSkills', next); }} /><button className="btn danger" onClick={()=>{ const next=skills.filter((_,j)=>j!==i); setSkills(next); writeStore('portfolioSkills', next); }}>Delete</button></div>)}</div>
   </Card></Page>;
