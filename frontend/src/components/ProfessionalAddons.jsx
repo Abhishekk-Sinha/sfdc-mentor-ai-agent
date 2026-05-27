@@ -125,20 +125,68 @@ export function NotificationCenter() {
 }
 
 export function LearningHeatmap() {
-  const activeDay = Number(readStore('mentorDay', 0)) || 1;
+  const activeDay = Number(readStore('mentorDay', 0)) || Number(readStore('focusDay', 0)) || 1;
   const notes = readStore('learningCalendarNotes', {});
   const mentorDone = readStore('mentorDone', {});
   const timeTasksByDay = readStore('timeTasksByDay', {});
   const days = Array.from({ length: 42 }, (_, i) => i + 1);
-  const strength = day => {
+  const getProofCount = day => {
     const taskDone = (timeTasksByDay[day] || []).filter(t => t.done).length;
     const routeDone = Object.keys(mentorDone).filter(k => k.startsWith(`${day}-`) && mentorDone[k]).length;
     const note = notes[day] ? 1 : 0;
-    return Math.min(4, taskDone + routeDone + note);
+    return taskDone + routeDone + note;
   };
-  return <Card title="Learning Heatmap" subtitle="Visual proof of studied, partial and missed days.">
-    <div className="heatmapGrid">{days.map(day => <span key={day} title={`Day ${day}`} className={`level${strength(day)} ${day === activeDay ? 'today' : ''}`}>{day}</span>)}</div>
-    <p className="hint">Dark = missed, bright = more proof saved. Current day is highlighted.</p>
+  const getStatus = count => count >= 4 ? 'Completed' : count >= 2 ? 'Partial' : count >= 1 ? 'Started' : 'No proof';
+  const getCellStyle = (day, count) => {
+    const isToday = day === activeDay;
+    const background = count >= 4
+      ? 'linear-gradient(135deg,#22c55e,#35d4ef)'
+      : count >= 2
+        ? 'linear-gradient(135deg,#0e7490,#2563eb)'
+        : count >= 1
+          ? 'linear-gradient(135deg,#334155,#0f766e)'
+          : '#0b1220';
+    return {
+      minHeight: 58,
+      borderRadius: 16,
+      border: isToday ? '2px solid #facc15' : '1px solid #253247',
+      background,
+      color: count >= 3 ? '#00111a' : '#eaf2ff',
+      display: 'grid',
+      placeItems: 'center',
+      padding: 8,
+      boxShadow: isToday ? '0 0 0 4px rgba(250,204,21,.15)' : '0 12px 28px rgba(0,0,0,.18)',
+      fontWeight: 900,
+      textAlign: 'center',
+    };
+  };
+  const studied = days.filter(day => getProofCount(day) > 0).length;
+  const completed = days.filter(day => getProofCount(day) >= 4).length;
+  const partial = days.filter(day => getProofCount(day) > 0 && getProofCount(day) < 4).length;
+  return <Card title="Learning Proof Map" subtitle="Professional 42-day view of studied, partial and missed learning days.">
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 12, marginBottom: 16 }}>
+      <div className="stat"><p>Studied Days</p><b>{studied}/42</b><small>Any proof saved</small></div>
+      <div className="stat"><p>Completed Days</p><b>{completed}</b><small>Strong proof days</small></div>
+      <div className="stat"><p>Partial Days</p><b>{partial}</b><small>Need completion</small></div>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(64px,1fr))', gap: 10 }}>
+      {days.map(day => {
+        const count = getProofCount(day);
+        const topic = roadmap90[(day - 1) % roadmap90.length]?.salesforce || 'Salesforce practice';
+        return <div key={day} style={getCellStyle(day, count)} title={`Day ${day}: ${getStatus(count)} | Proof items: ${count} | ${topic}`}>
+          <span style={{ display: 'block', fontSize: 15 }}>Day {day}</span>
+          <small style={{ color: 'inherit', opacity: .9 }}>{day === activeDay ? 'Today' : getStatus(count)}</small>
+        </div>;
+      })}
+    </div>
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
+      <span className="pill">No proof = missed</span>
+      <span className="pill">Started = 1 proof</span>
+      <span className="pill">Partial = 2-3 proofs</span>
+      <span className="pill">Completed = 4+ proofs</span>
+      <span className="pill">Yellow border = today</span>
+    </div>
+    <p className="hint">This map becomes brighter when you complete route tasks, save day notes, or finish time-tracker tasks. It is proof-based, so it stays honest and professional.</p>
   </Card>;
 }
 
