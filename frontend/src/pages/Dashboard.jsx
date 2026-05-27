@@ -202,18 +202,59 @@ function QuickStartCard() {
 
 function LearningCalendar({ activeDay }) {
   const [startDate, setStartDate] = React.useState(() => readStore('learningStartDate', ''));
-  const notes = readStore('learningCalendarNotes', {});
-  const [selectedDay, setSelectedDay] = React.useState(activeDay);
-  const [note, setNote] = React.useState(notes[activeDay] || '');
-  const days = Array.from({ length: 14 }, (_, i) => Math.max(1, activeDay - 3 + i)).filter(day => day <= 90);
+  const [notes, setNotes] = React.useState(() => readStore('learningCalendarNotes', {}));
+  const [selectedDay, setSelectedDay] = React.useState(Math.min(activeDay, 45));
+  const [note, setNote] = React.useState(() => readStore('learningCalendarNotes', {})[Math.min(activeDay, 45)] || '');
+  const [rangeFilter, setRangeFilter] = React.useState(activeDay <= 15 ? '1-15' : activeDay <= 30 ? '16-30' : '31-45');
+  const [noteFilter, setNoteFilter] = React.useState('All');
+  const allDays = Array.from({ length: 45 }, (_, i) => i + 1);
+  const getRangeDays = () => {
+    if (rangeFilter === '1-15') return allDays.filter(day => day <= 15);
+    if (rangeFilter === '16-30') return allDays.filter(day => day >= 16 && day <= 30);
+    if (rangeFilter === '31-45') return allDays.filter(day => day >= 31 && day <= 45);
+    return allDays;
+  };
+  const filteredDays = getRangeDays().filter(day => noteFilter === 'All' || (noteFilter === 'Notes Saved' ? Boolean(notes[day]) : !notes[day]));
+  const selectedTopic = roadmap90[(selectedDay - 1) % roadmap90.length] || {};
+  const savedCount = allDays.filter(day => notes[day]).length;
   const saveStartDate = () => { writeStore('learningStartDate', startDate); window.dispatchEvent(new Event('storage')); };
-  const saveDayNote = () => { const next = readStore('learningCalendarNotes', {}); next[selectedDay] = note; writeStore('learningCalendarNotes', next); window.dispatchEvent(new Event('storage')); };
-  return <Card title="Learning Calendar" subtitle="Save your start date and recovery notes for gap days.">
+  const selectDay = dayValue => {
+    const day = Math.max(1, Math.min(45, Number(dayValue) || 1));
+    setSelectedDay(day);
+    setNote(readStore('learningCalendarNotes', {})[day] || '');
+    if (day <= 15) setRangeFilter('1-15');
+    else if (day <= 30) setRangeFilter('16-30');
+    else setRangeFilter('31-45');
+  };
+  const saveDayNote = () => {
+    const next = { ...notes, [selectedDay]: note };
+    if (!note.trim()) delete next[selectedDay];
+    setNotes(next);
+    writeStore('learningCalendarNotes', next);
+    window.dispatchEvent(new Event('storage'));
+  };
+  const clearDayNote = () => {
+    const next = { ...notes };
+    delete next[selectedDay];
+    setNotes(next);
+    setNote('');
+    writeStore('learningCalendarNotes', next);
+    window.dispatchEvent(new Event('storage'));
+  };
+  return <Card title="Learning Calendar" subtitle="Filter Day 1 to Day 45, select a day, and save your daily recovery/proof note.">
     <div className="learningCalendarPro">
       <div className="calendarStartRow"><label><span>Day 1 Start Date</span><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></label><button className="btn cyan" onClick={saveStartDate}>Save Start</button></div>
-      <div className="calendarDayGrid">{days.map(day => <button key={day} className={day === selectedDay ? 'active' : ''} onClick={() => { setSelectedDay(day); setNote(readStore('learningCalendarNotes', {})[day] || ''); }}><b>Day {day}</b><small>{day === activeDay ? 'Today' : readStore('learningCalendarNotes', {})[day] ? 'Note saved' : 'Plan'}</small></button>)}</div>
-      <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Write gap reason, revision note, or recovery plan..." />
-      <button className="btn ghost" onClick={saveDayNote}>Save Day Note</button>
+      <div className="calendarFilterPanel">
+        <label><span>Select Day</span><select value={selectedDay} onChange={e => selectDay(e.target.value)}>{allDays.map(day => <option key={day} value={day}>Day {day}</option>)}</select></label>
+        <label><span>Range</span><select value={rangeFilter} onChange={e => setRangeFilter(e.target.value)}><option>All</option><option>1-15</option><option>16-30</option><option>31-45</option></select></label>
+        <label><span>Filter</span><select value={noteFilter} onChange={e => setNoteFilter(e.target.value)}><option>All</option><option>Notes Saved</option><option>No Notes</option></select></label>
+        <button className="btn ghost" onClick={() => selectDay(Math.min(activeDay, 45))}>Today</button>
+      </div>
+      <div className="calendarMiniSummary"><div><b>{savedCount}/45</b><span>notes saved</span></div><div><b>Day {selectedDay}</b><span>{notes[selectedDay] ? 'note saved' : 'no note yet'}</span></div></div>
+      <div className="calendarDayGrid">{filteredDays.length ? filteredDays.map(day => <button key={day} className={`${day === selectedDay ? 'active' : ''} ${notes[day] ? 'hasNote' : ''}`} onClick={() => selectDay(day)}><b>Day {day}</b><small>{day === activeDay ? 'Today' : notes[day] ? 'Note saved' : 'Plan'}</small></button>) : <div className="emptyMiniState"><b>No days found</b><p>Change range or filter.</p></div>}</div>
+      <div className="calendarSelectedPanel"><b>Day {selectedDay} Plan</b><span>{selectedTopic.salesforce || 'Salesforce practice'}</span><small>{selectedTopic.dsa || 'DSA practice'} • {selectedTopic.systemDesign || 'System Design'}</small></div>
+      <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Write what happened today: studied topic, missed reason, recovery plan, interview answer saved..." />
+      <div className="proofActions"><button className="btn cyan" onClick={saveDayNote}>Save Day Note</button><button className="btn ghost" onClick={clearDayNote}>Clear Note</button></div>
     </div>
   </Card>;
 }
