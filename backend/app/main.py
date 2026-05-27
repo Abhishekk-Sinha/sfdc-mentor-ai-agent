@@ -6,15 +6,26 @@ from email.message import EmailMessage
 import hashlib, hmac, json, os, random, smtplib, sqlite3, time, urllib.parse, urllib.request
 from pathlib import Path
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="2.8.1")
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.8.3")
 ALLOWED_ORIGINS = [
     "https://abhishekk-sinha.github.io",
     "https://abhishekk-sinha.github.io/sfdc-mentor-ai-agent",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
 ]
 extra_origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "").split(",") if x.strip()]
-app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS + extra_origins, allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS + extra_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1):\d+",
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 DB_PATH = Path(__file__).resolve().parent.parent / "mentor_storage.sqlite3"
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
@@ -170,9 +181,9 @@ def send_otp_email(email: str, name: str, otp: str, purpose: str = "signup") -> 
 @app.get("/")
 def root(): return {"status": "running", "app": "SFDC Mentor Complete Backend", "docs": "/docs", "sqlite_db": str(DB_PATH)}
 @app.get("/api/health")
-def health(): return {"ok": True, "service": "mentor-backend", "mode": "sqlite + auth otp + password reset + resend/smtp + ollama + search-links", "version": "2.8.1", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
+def health(): return {"ok": True, "service": "mentor-backend", "mode": "sqlite + auth otp + password reset + resend/smtp + ollama + search-links", "version": "2.8.3", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
 @app.get("/api/cors-test")
-def cors_test(): return {"ok": True, "message": "CORS is configured for GitHub Pages and localhost.", "allowed_origins": ALLOWED_ORIGINS}
+def cors_test(): return {"ok": True, "message": "CORS is configured for GitHub Pages and all localhost dev ports.", "allowed_origins": ALLOWED_ORIGINS}
 @app.get("/api/debug/smtp")
 def debug_smtp():
     return {"ok": True, "resend_api_key": bool(os.getenv("RESEND_API_KEY", "").strip()), "smtp_host": bool(os.getenv("SMTP_HOST", "").strip()), "smtp_port": os.getenv("SMTP_PORT", "587"), "smtp_user": bool(os.getenv("SMTP_USER", "").strip()), "smtp_password": bool(os.getenv("SMTP_PASSWORD", "").strip()), "mail_from": os.getenv("MAIL_FROM", ""), "last_email_provider": LAST_EMAIL_PROVIDER, "last_email_error": LAST_EMAIL_ERROR}
@@ -190,7 +201,7 @@ def request_signup_otp(req: SignupOtpRequest):
     conn.execute("INSERT INTO signup_otps(email,otp_hash,name,mobile,password_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?,?,0,?)", (email, hash_otp(otp), name, mobile, hash_password(password), expires_at, now_ts()))
     conn.commit(); conn.close()
     sent = send_otp_email(email, name, otp, "signup")
-    return {"ok": True, "message": "OTP sent to your email. Verify OTP to complete signup." if sent else "OTP generated, but email delivery failed. Please configure Resend email provider.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent, "email_provider": LAST_EMAIL_PROVIDER}
+    return {"ok": True, "message": "OTP sent to your email. Verify OTP to complete signup." if sent else "OTP generated, but email delivery failed. Check email provider settings.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent, "email_provider": LAST_EMAIL_PROVIDER}
 
 
 @app.post("/api/auth/verify-signup-otp")
@@ -232,7 +243,7 @@ def forgot_password(req: ForgotPasswordRequest):
     conn.execute("INSERT INTO password_reset_otps(email,otp_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?)", (email, hash_otp(otp), expires_at, 0, now_ts()))
     conn.commit(); conn.close()
     sent = send_otp_email(email, user["name"], otp, "password reset")
-    return {"ok": True, "message": "Password reset OTP sent to your email." if sent else "Reset OTP generated, but email delivery failed. Please configure Resend email provider.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent, "email_provider": LAST_EMAIL_PROVIDER}
+    return {"ok": True, "message": "Password reset OTP sent to your email." if sent else "Reset OTP generated, but email delivery failed. Check email provider settings.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent, "email_provider": LAST_EMAIL_PROVIDER}
 
 
 @app.post("/api/auth/reset-password")
