@@ -6,24 +6,12 @@ from email.message import EmailMessage
 import hashlib, hmac, json, os, random, smtplib, sqlite3, time, urllib.parse, urllib.request
 from pathlib import Path
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="2.8.3")
-ALLOWED_ORIGINS = [
-    "https://abhishekk-sinha.github.io",
-    "https://abhishekk-sinha.github.io/sfdc-mentor-ai-agent",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-    "http://localhost:5175",
-    "http://127.0.0.1:5175",
-]
-extra_origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "").split(",") if x.strip()]
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.8.4")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS + extra_origins,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1):\d+",
+    allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -181,9 +169,9 @@ def send_otp_email(email: str, name: str, otp: str, purpose: str = "signup") -> 
 @app.get("/")
 def root(): return {"status": "running", "app": "SFDC Mentor Complete Backend", "docs": "/docs", "sqlite_db": str(DB_PATH)}
 @app.get("/api/health")
-def health(): return {"ok": True, "service": "mentor-backend", "mode": "sqlite + auth otp + password reset + resend/smtp + ollama + search-links", "version": "2.8.3", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
+def health(): return {"ok": True, "service": "mentor-backend", "mode": "sqlite + auth otp + password reset + open-cors + resend/smtp + ollama + search-links", "version": "2.8.4", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
 @app.get("/api/cors-test")
-def cors_test(): return {"ok": True, "message": "CORS is configured for GitHub Pages and all localhost dev ports.", "allowed_origins": ALLOWED_ORIGINS}
+def cors_test(): return {"ok": True, "message": "CORS is open for local development and GitHub Pages.", "allowed_origins": ["*"]}
 @app.get("/api/debug/smtp")
 def debug_smtp():
     return {"ok": True, "resend_api_key": bool(os.getenv("RESEND_API_KEY", "").strip()), "smtp_host": bool(os.getenv("SMTP_HOST", "").strip()), "smtp_port": os.getenv("SMTP_PORT", "587"), "smtp_user": bool(os.getenv("SMTP_USER", "").strip()), "smtp_password": bool(os.getenv("SMTP_PASSWORD", "").strip()), "mail_from": os.getenv("MAIL_FROM", ""), "last_email_provider": LAST_EMAIL_PROVIDER, "last_email_error": LAST_EMAIL_ERROR}
