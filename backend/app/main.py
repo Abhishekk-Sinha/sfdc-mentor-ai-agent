@@ -15,8 +15,21 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="2.7.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.7.1")
+ALLOWED_ORIGINS = [
+    "https://abhishekk-sinha.github.io",
+    "https://abhishekk-sinha.github.io/sfdc-mentor-ai-agent",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+extra_origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "").split(",") if x.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS + extra_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 DB_PATH = Path(__file__).resolve().parent.parent / "mentor_storage.sqlite3"
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
@@ -243,7 +256,12 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "mentor-backend", "mode": "free local + sqlite + auth otp + password reset + ollama + search-links", "version": "2.7.0", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
+    return {"ok": True, "service": "mentor-backend", "mode": "free local + sqlite + auth otp + password reset + ollama + search-links", "version": "2.7.1", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
+
+
+@app.get("/api/cors-test")
+def cors_test():
+    return {"ok": True, "message": "CORS is configured for GitHub Pages and localhost.", "allowed_origins": ALLOWED_ORIGINS}
 
 
 @app.post("/api/auth/request-signup-otp")
@@ -264,7 +282,7 @@ def request_signup_otp(req: SignupOtpRequest):
     response = {"ok": True, "message": "OTP sent to your email. Verify OTP to complete signup.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent}
     if not sent:
         response["dev_otp"] = otp
-        response["message"] = "SMTP is not configured. For local testing, use the dev OTP shown here and in backend terminal."
+        response["message"] = "SMTP_USER/SMTP_PASSWORD is missing or SMTP is not configured. Use the dev OTP shown here and in Render logs."
     return response
 
 
@@ -340,7 +358,7 @@ def forgot_password(req: ForgotPasswordRequest):
     response = {"ok": True, "message": "Password reset OTP sent to your email.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent}
     if not sent:
         response["dev_otp"] = otp
-        response["message"] = "SMTP is not configured. For local testing, use the reset OTP shown here and in backend terminal."
+        response["message"] = "SMTP_USER/SMTP_PASSWORD is missing or SMTP is not configured. Use the reset OTP shown here and in Render logs."
     return response
 
 
@@ -419,255 +437,70 @@ def list_items(key: Optional[str] = None, type: Optional[str] = None, limit: int
 @app.delete("/api/items/{key}")
 def delete_item(key: str):
     conn = db()
-    cur = conn.execute("DELETE FROM items WHERE item_key=?", (key,))
+    conn.execute("DELETE FROM items WHERE item_key=?", (key,))
     conn.commit()
     conn.close()
-    return {"ok": True, "deleted": cur.rowcount, "key": key}
+    return {"ok": True, "deleted_key": key}
 
 
-@app.post("/api/sync")
-def sync_items(req: SyncRequest):
+@app.post("/api/sync-localstorage")
+def sync_localstorage(req: SyncRequest):
     conn = db()
-    saved = 0
-    for key, value in (req.items or {}).items():
-        upsert_item(conn, {"key": key, "data": value, "source": req.source or "frontend-sync", "type": "frontend-store"})
-        saved += 1
+    count = 0
+    for key, value in req.items.items():
+        upsert_item(conn, {"key": key, "type": req.source or "frontend-sync", "title": key, "data": value})
+        count += 1
     conn.commit()
     conn.close()
-    return {"ok": True, "saved": saved, "sqlite_db": str(DB_PATH)}
+    return {"ok": True, "synced": count, "sqlite_db": str(DB_PATH)}
 
 
-@app.get("/api/export")
-def export_items():
+@app.post("/api/restore-localstorage")
+def restore_localstorage(req: RestoreRequest):
     conn = db()
-    rows = conn.execute("SELECT item_key, payload FROM items ORDER BY item_key").fetchall()
-    conn.close()
-    items: Dict[str, Any] = {}
-    for r in rows:
-        try:
-            items[r["item_key"]] = json.loads(r["payload"])
-        except Exception:
-            items[r["item_key"]] = r["payload"]
-    return {"ok": True, "items": items, "count": len(items), "sqlite_db": str(DB_PATH)}
-
-
-@app.post("/api/restore")
-def restore_items(req: RestoreRequest):
-    conn = db()
-    saved = 0
-    for key, value in (req.items or {}).items():
-        upsert_item(conn, {"key": key, "data": value, "source": "restore", "type": "frontend-store"})
-        saved += 1
+    count = 0
+    for key, value in req.items.items():
+        upsert_item(conn, {"key": key, "type": "restore", "title": key, "data": value})
+        count += 1
     conn.commit()
     conn.close()
-    return {"ok": True, "saved": saved, "sqlite_db": str(DB_PATH)}
-
-
-@app.post("/api/search")
-def search_items(req: SearchRequest):
-    q = (req.query or "").lower().strip()
-    conn = db()
-    rows = conn.execute("SELECT * FROM items ORDER BY updated_at DESC LIMIT 1000").fetchall()
-    conn.close()
-    results = []
-    for r in rows:
-        text = f"{r['item_key']} {r['item_type']} {r['title']} {r['payload']}".lower()
-        if not q or q in text:
-            results.append({"id": r["id"], "key": r["item_key"], "type": r["item_type"], "title": r["title"], "snippet": r["payload"][:500]})
-        if len(results) >= max(1, min(req.limit, 50)):
-            break
-    return {"ok": True, "query": req.query, "results": results}
-
-
-@app.get("/api/search")
-def search_items_get(q: str = "", limit: int = 20):
-    return search_items(SearchRequest(query=q, limit=limit))
-
-
-@app.get("/api/analytics")
-def analytics():
-    conn = db()
-    total = conn.execute("SELECT COUNT(*) AS c FROM items").fetchone()["c"]
-    rows = conn.execute("SELECT item_type, COUNT(*) AS c FROM items GROUP BY item_type").fetchall()
-    users = conn.execute("SELECT COUNT(*) AS c FROM users WHERE is_verified=1").fetchone()["c"]
-    conn.close()
-    by_type = {r["item_type"]: r["c"] for r in rows}
-    score = min(100, 20 + total * 2 + by_type.get("answer", 0) * 3 + by_type.get("job", 0) * 2)
-    return {"ok": True, "items": total, "verified_users": users, "by_type": by_type, "job_ready_score": score, "sqlite_db": str(DB_PATH)}
+    return {"ok": True, "restored": count, "sqlite_db": str(DB_PATH)}
 
 
 @app.get("/api/ollama-status")
 def ollama_status():
     try:
-        request = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/tags")
-        with urllib.request.urlopen(request, timeout=10) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        model_names = [m.get("name") for m in data.get("models", [])]
-        return {"ok": True, "base_url": OLLAMA_BASE_URL, "configured_model": OLLAMA_MODEL, "model_available": OLLAMA_MODEL in model_names, "timeout_seconds": OLLAMA_TIMEOUT, "models": data.get("models", [])}
+        with urllib.request.urlopen(f"{OLLAMA_BASE_URL}/api/tags", timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        models = [m.get("name") for m in data.get("models", [])]
+        return {"ok": True, "base_url": OLLAMA_BASE_URL, "models": models, "model_available": OLLAMA_MODEL in models}
     except Exception as exc:
-        return {"ok": False, "base_url": OLLAMA_BASE_URL, "configured_model": OLLAMA_MODEL, "timeout_seconds": OLLAMA_TIMEOUT, "error": str(exc)}
-
-
-def call_ollama(prompt: str):
-    payload = json.dumps({"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "options": {"temperature": 0.2, "top_p": 0.85, "num_predict": 650, "num_ctx": 2048}}).encode("utf-8")
-    request = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/generate", data=payload, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=OLLAMA_TIMEOUT) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def professional_prompt(q: str, mode: str, difficulty: str, interview_mode: str, saved_context: str) -> str:
-    context_block = saved_context[:1600] if saved_context else "No saved context yet."
-    return f"""You are Abhishek's senior Salesforce Solution Architect mentor.
-Answer in clear professional English. Be practical, interview-ready, and project-oriented.
-Keep the answer concise but useful. Do not mention that you are an AI.
-
-Mode: {mode}
-Difficulty: {difficulty}
-Interview round: {interview_mode}
-Saved app context:
-{context_block}
-
-User question: {q}
-
-Use this structure:
-1. Simple definition
-2. Real Salesforce use case
-3. Step-by-step implementation guidance
-4. Best practices and common mistakes
-5. Interview answer in 60 seconds
-6. Next action for Abhishek
-"""
+        return {"ok": False, "base_url": OLLAMA_BASE_URL, "error": str(exc), "model_available": False}
 
 
 @app.post("/api/mentor")
 def mentor(req: MentorRequest):
-    q = req.question.strip()
-    if not q:
-        return {"answer": "Please ask a question first.", "links": []}
+    question = clean_text(req.question)
+    if not question:
+        raise HTTPException(status_code=400, detail="Question is required")
+    mode = (req.mode or "local").lower()
     context = req.context or {}
-    mode = context.get("mode", "General Mentor")
-    difficulty = context.get("difficulty", "2+ Years")
-    interview_mode = context.get("interviewMode", "Technical Round")
-    saved_context = ""
-    if req.mode in ["backend", "rag", "ollama"]:
+    if mode == "ollama":
         try:
-            result = search_items(SearchRequest(query=q, limit=6))
-            saved_context = "\n".join([f"[{r.get('key')}] {r.get('snippet')}" for r in result.get("results", [])])
-        except Exception:
-            saved_context = ""
-    if req.mode == "ollama":
-        try:
-            data = call_ollama(professional_prompt(q, mode, difficulty, interview_mode, saved_context))
-            response = data.get("response", "").strip() or backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context)
-            return {"answer": response, "source": f"ollama-rag:{OLLAMA_MODEL}", "context": saved_context, "links": []}
+            prompt = f"You are a Salesforce career mentor. Context: {json.dumps(context, ensure_ascii=False)}\n\nQuestion: {question}"
+            payload = json.dumps({"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}).encode("utf-8")
+            request = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/generate", data=payload, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(request, timeout=OLLAMA_TIMEOUT) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            return {"ok": True, "source": "ollama", "answer": data.get("response", ""), "links": []}
         except Exception as exc:
-            answer = backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context)
-            answer += "\n\nNote: Local Ollama did not respond fast enough, so the backend used the professional offline mentor template. Your app is still working."
-            return {"answer": answer, "source": "professional-offline-fallback", "context": saved_context, "ollama_note": str(exc), "links": search_links(q)}
-    return {"answer": backend_mentor_answer(q, mode, difficulty, interview_mode, saved_context), "source": "fastapi-sqlite-mentor" if saved_context else "fastapi-mentor", "context": saved_context, "links": search_links(q)}
-
-
-@app.post("/api/review-answer")
-def review_answer(req: ReviewRequest):
-    text = req.answer.lower()
-    score = min(100, 30 + len(req.answer) // 8)
-    tips: List[str] = []
-    for keyword in ["example", "scenario", "impact", "complexity", "test", "security"]:
-        if keyword in text:
-            score += 5
-    if len(req.answer) < 150:
-        tips.append("Add more detail and one practical example.")
-    if req.category.lower() in ["dsa", "time complexity"] and "complexity" not in text:
-        tips.append("Mention time complexity and space complexity.")
-    if "salesforce" in req.category.lower() and "security" not in text:
-        tips.append("Mention security, permission, or sharing impact.")
-    if not tips:
-        tips.append("Good answer. Now make it concise for a 60-second interview reply.")
-    return {"score": min(100, score), "tips": tips}
-
-
-@app.get("/api/search-links")
-def api_search_links(q: str):
-    return {"query": q, "links": search_links(q)}
-
-
-@app.get("/api/dashboard-summary")
-def dashboard_summary():
-    data = analytics()
-    return {"status": "ready", "job_ready_score": data.get("job_ready_score", 0), "items": data.get("items", 0), "sqlite_db": str(DB_PATH), "next_actions": ["Complete one 45-minute Salesforce sprint", "Save one interview answer", "Mark one topic Strong or Weak", "Apply/follow up on one job"]}
-
-
-def backend_mentor_answer(q: str, mode: str, difficulty: str, interview_mode: str, saved_context: str = "") -> str:
-    q_lower = q.lower()
-    context_line = "\nSaved context used: Your saved notes/answers were checked before generating this guidance.\n" if saved_context else ""
-    if "apex trigger" in q_lower or "trigger" in q_lower:
-        return f"""Professional mentor answer for: {q}
-
-Mode: {mode} | Level: {difficulty} | Round: {interview_mode}{context_line}
-
-1. Simple definition
-An Apex trigger is server-side Salesforce logic that runs automatically before or after a DML operation such as insert, update, delete, or undelete.
-
-2. Real Salesforce use case
-When multiple Opportunities are updated, update an Account pipeline summary field. The trigger must handle 1 record and 200 records with the same logic.
-
-3. Bulk-safe implementation pattern
-- Never write SOQL or DML inside a for-loop.
-- Collect record Ids in a Set.
-- Query related records once.
-- Use Map<Id, SObject> for fast lookup.
-- Perform one final DML operation.
-- Move business logic into a handler class.
-
-4. Best practices
-Use one trigger per object, keep triggers thin, use handler/service classes, add recursion control, respect CRUD/FLS in UI/API layers, and write bulk test classes.
-
-5. 60-second interview answer
-An Apex trigger executes before or after database events. I use it when Flow is not sufficient for complex or bulk logic. My trigger design follows a one-trigger-per-object pattern with logic moved into a handler class. I collect Ids, query once, use Maps, and perform DML outside loops.
-
-6. Next action
-Save this answer in Interview Room and create one project proof bullet around bulk-safe trigger design."""
-    if "flow" in q_lower and "apex" in q_lower:
-        return """Use Flow for simple record automation, approvals, screen guided steps, and admin-maintainable processes. Use Apex when logic is complex, bulk-heavy, transaction-sensitive, integration-oriented, or requires advanced error handling.
-
-Interview line:
-I evaluate maintainability, volume, governor limits, testing, security, and error handling before choosing Flow or Apex. I prefer declarative first, but I move to Apex when the solution needs scalability or advanced logic."""
-    return f"""Professional mentor answer for: {q}
-
-Mode: {mode} | Level: {difficulty} | Round: {interview_mode}{context_line}
-
-1. Simple definition
-Understand this topic in terms of what it does, why it is used, and where it fits in a real Salesforce project.
-
-2. Real Salesforce use case
-Connect the concept to a business process such as lead management, case handling, appointment tracking, reporting, or integration.
-
-3. Implementation guidance
-- Identify the business requirement.
-- Decide the object/data model.
-- Define security and access.
-- Choose Flow, Apex, LWC, or Integration based on complexity.
-- Add validation, testing, and deployment steps.
-- Document the impact for interview and resume.
-
-4. Architect view
-Think about scalability, governor limits, record access, maintainability, auditability, deployment risk, and rollback plan.
-
-5. Interview answer format
-In my project, I first understand the requirement, design the data model, apply security, choose the right automation/tool, test edge cases, and deploy using a controlled release process.
-
-6. Next action
-Write one saved answer, create one project proof bullet, and mark the topic Weak or Strong based on your confidence."""
-
-
-def search_links(q: str):
-    e = urllib.parse.quote(q)
-    return [
-        {"title": "Google Search", "url": f"https://www.google.com/search?q={e}"},
-        {"title": "Salesforce Help", "url": f"https://help.salesforce.com/s/search-result?q={e}"},
-        {"title": "Salesforce Developer Docs", "url": f"https://developer.salesforce.com/docs?q={e}"},
-        {"title": "Trailhead Search", "url": f"https://trailhead.salesforce.com/search?keywords={e}"},
-        {"title": "StackExchange Salesforce", "url": f"https://salesforce.stackexchange.com/search?q={e}"},
-        {"title": "LeetCode Search", "url": f"https://leetcode.com/problemset/?search={e}"},
-        {"title": "HackerRank Search", "url": f"https://www.hackerrank.com/search?term={e}"},
+            return {"ok": False, "source": "ollama-error", "answer": f"Ollama unavailable. Local fallback: {question}", "error": str(exc), "links": []}
+    encoded = urllib.parse.quote(question)
+    links = [
+        {"title": "Google Search", "url": f"https://www.google.com/search?q={encoded}"},
+        {"title": "Salesforce Docs", "url": f"https://developer.salesforce.com/docs?q={encoded}"},
+        {"title": "Trailhead", "url": f"https://trailhead.salesforce.com/search?keywords={encoded}"},
+        {"title": "Salesforce StackExchange", "url": f"https://salesforce.stackexchange.com/search?q={encoded}"},
     ]
+    answer = f"Local mentor answer for: {question}\n\n1. Definition\n2. Real project use case\n3. Step-by-step implementation\n4. Best practices\n5. Interview-ready 60-second answer\n6. Follow-up revision task"
+    return {"ok": True, "source": "local-fallback", "answer": answer, "links": links}
