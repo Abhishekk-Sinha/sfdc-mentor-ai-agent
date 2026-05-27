@@ -92,12 +92,12 @@ function DashboardHero(data) {
   return <section className="hero premiumHero dashboardHeroPro" style={{ alignItems: 'stretch' }}>
     <div className="dashboardHeroContent">
       <p className="eyebrow">Professional Home Guide</p>
-      <h1>Salesforce Career Command Center</h1>
-      <p>One clean daily dashboard for learning, interview preparation, project proof and job tracking. Follow the next action, save proof, and move your Job Ready score honestly.</p>
+      <h1>Welcome back, Abhishek</h1>
+      <p>Today’s mission: learn one Salesforce skill, practice one answer, save proof, and move closer to job-ready. Start from the guide below and follow the app in a simple order.</p>
       <div className="dashboardHeroActions">
-        <Link className="btn cyan" to="/practice">Start Today's Practice</Link>
-        <Link className="btn ghost" to="/ai-mentor">Ask AI Mentor</Link>
-        <Link className="btn ghost" to="/job-tracker">Update Job Tracker</Link>
+        <Link className="btn cyan" to="/mentor-route">Open Today’s Route</Link>
+        <Link className="btn ghost" to="/practice">Practice Questions</Link>
+        <Link className="btn ghost" to="/time-tracker">Track 8 Hours</Link>
       </div>
       <div className="heroMiniStats" style={{ marginTop: 18 }}>{heroStats.map(item => <div key={item.label}><b>{item.value}</b><span>{item.label}</span></div>)}</div>
     </div>
@@ -107,6 +107,45 @@ function DashboardHero(data) {
       <MomentumGraph score={score} savedAnswers={savedAnswers} strong={strong} applied={applied} completedTasks={completedTasks} totalTasks={totalTasks} routeDoneToday={routeDoneToday} weeklyResults={weeklyResults} />
     </div>
   </section>;
+}
+
+function HomeGuideFlow() {
+  const steps = [
+    { n: '01', title: 'Learn', text: 'Open Today’s Route and understand one topic clearly.', to: '/mentor-route' },
+    { n: '02', title: 'Practice', text: 'Solve Salesforce, DSA and System Design questions.', to: '/practice' },
+    { n: '03', title: 'Save Proof', text: 'Write one interview answer or project note before closing.', to: '/interview' },
+    { n: '04', title: 'Ask Mentor', text: 'Ask the AI Mentor when you get stuck or need explanation.', to: '/ai-mentor' },
+    { n: '05', title: 'Track Progress', text: 'Update time, weak topics, job tracker and daily completion.', to: '/time-tracker' },
+  ];
+  return <Card title="Start Here: Simple Daily Path" subtitle="Use this order every day. No confusion, no random clicking.">
+    <div className="homeGuideFlow">{steps.map(step => <Link key={step.n} to={step.to} className="guideStepCard"><b>{step.n}</b><span>{step.title}</span><small>{step.text}</small></Link>)}</div>
+  </Card>;
+}
+
+function BeginnerCompass({ activeDay, today, weak, savedAnswers }) {
+  const items = [
+    { title: 'I do not know what to study', text: `Start Day ${activeDay}: ${today.salesforce}`, to: '/mentor-route', action: 'Open Route' },
+    { title: 'I need questions', text: 'Open Question Bank and save at least one answer.', to: '/practice', action: 'Practice' },
+    { title: 'I forgot a topic', text: weak > 0 ? `Revise ${weak} weak topic(s) first.` : 'Mark topics Weak/Strong after practice.', to: '/focus', action: 'Focus' },
+    { title: 'I need interview confidence', text: savedAnswers < 10 ? 'Write one 60-second answer today.' : 'Improve one saved answer with project impact.', to: '/interview', action: 'Interview' },
+  ];
+  return <Card title="Beginner Compass" subtitle="Choose what you need right now. The app will take you to the correct place.">
+    <div className="beginnerCompassGrid">{items.map(item => <Link key={item.title} to={item.to} className="compassTile"><h3>{item.title}</h3><p>{item.text}</p><span>{item.action}</span></Link>)}</div>
+  </Card>;
+}
+
+function DailyStudyBlocks() {
+  const blocks = [
+    ['2h', 'Salesforce Core', 'Apex, LWC, Flow, SOQL or Security'],
+    ['1h', 'DSA', 'One pattern, one problem, one note'],
+    ['1h', 'System Design', 'Concept + real-world explanation'],
+    ['2h', 'Project Proof', 'Build, fix, document or polish project'],
+    ['1h', 'Interview Practice', 'Write, speak and save one answer'],
+    ['1h', 'Revision + Job', 'Weak topics, resume, job tracker'],
+  ];
+  return <Card title="8-Hour Study Structure" subtitle="A simple daily split for basic to advanced learning.">
+    <div className="studyBlockGrid">{blocks.map(([time, title, text]) => <div key={title}><b>{time}</b><span>{title}</span><small>{text}</small></div>)}</div>
+  </Card>;
 }
 
 function DailyPlan({ activeDay, today, weak }) {
@@ -209,7 +248,9 @@ export function Dashboard() {
   const data = useDashboardData();
   return <Layout><Page data-refresh={refreshTick}>
     <DashboardHero {...data} />
+    <HomeGuideFlow />
     <HomeExecutiveGrid {...data} />
+    <div className="grid2"><BeginnerCompass {...data} /><DailyStudyBlocks /></div>
     <DailyPlan {...data} />
     <div className="grid2"><NextActions {...data} /><ScoreBreakdown {...data} /></div>
     <div className="grid2"><LearningCalendar {...data} /><QuickStartCard /></div>
