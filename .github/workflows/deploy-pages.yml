@@ -10,15 +10,15 @@ permissions:
   pages: write
   id-token: write
 
+environment:
+  name: github-pages
+
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,11 +33,14 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci || npm install
 
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      - name: Add SPA fallback
+        run: cp frontend/dist/index.html frontend/dist/404.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
