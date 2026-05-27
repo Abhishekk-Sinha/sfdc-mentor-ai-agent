@@ -4,7 +4,9 @@ import { cvSkills, experience, profile, projects } from '../data/profile';
 import { Card, Field, Page } from '../components/UI';
 import { readStore, writeStore } from '../utils/storage';
 
-const API_BASE = 'https://sfdc-mentor-backend.onrender.com';
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:8000'
+  : 'https://sfdc-mentor-backend.onrender.com';
 
 const defaultPhoto = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420">
