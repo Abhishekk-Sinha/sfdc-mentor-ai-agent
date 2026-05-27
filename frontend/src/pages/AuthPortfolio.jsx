@@ -105,9 +105,16 @@ export function Login() {
   const [busy, setBusy] = React.useState(false);
   const [status, setStatus] = React.useState('');
   const [devOtp, setDevOtp] = React.useState('');
-  const [form, setForm] = React.useState({ name: '', email: profile.email || '', mobile: '', password: '', otp: '' });
+  const [form, setForm] = React.useState({ name: '', email: profile.email || '', mobile: '', password: '', otp: '', newPassword: '' });
 
   const setValue = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+  const switchMode = nextMode => {
+    setMode(nextMode);
+    setStatus('');
+    setDevOtp('');
+    setOtpSent(false);
+    setForm(prev => ({ ...prev, otp: '', newPassword: '' }));
+  };
   const finishSession = user => {
     writeStore('session', { name: user.name, email: user.email, mobile: user.mobile, type: user.type || 'user', verified: true, remember });
     nav('/dashboard');
@@ -160,11 +167,47 @@ export function Login() {
     }
   };
 
+  const forgotPassword = async () => {
+    setBusy(true);
+    setStatus('');
+    setDevOtp('');
+    try {
+      const data = await apiPost('/api/auth/forgot-password', { email: form.email });
+      setOtpSent(true);
+      setDevOtp(data.dev_otp || '');
+      setStatus(data.message || 'Password reset OTP sent to your email.');
+    } catch (err) {
+      setStatus(err.message || 'Could not send password reset OTP.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetPassword = async () => {
+    setBusy(true);
+    setStatus('');
+    try {
+      const data = await apiPost('/api/auth/reset-password', { email: form.email, otp: form.otp, new_password: form.newPassword });
+      setStatus(data.message || 'Password reset successful. Please login.');
+      setForm(prev => ({ ...prev, password: '', otp: '', newPassword: '' }));
+      setDevOtp('');
+      setOtpSent(false);
+      setMode('login');
+    } catch (err) {
+      setStatus(err.message || 'Password reset failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const isSignup = mode === 'signup';
+  const isForgot = mode === 'forgot';
+
   return <div className="loginPage premiumLoginPage">
     <section className="loginShowcase">
       <div className="loginPhotoFrame"><img src={photo} alt="Abhishek Kumar" /></div>
       <p className="eyebrow">Salesforce Career OS</p>
-      <h1>{mode === 'signup' ? 'Create verified account' : 'Welcome back, Abhishek'}</h1>
+      <h1>{isSignup ? 'Create verified account' : isForgot ? 'Reset your password' : 'Welcome back, Abhishek'}</h1>
       <p>Track skills, answers, projects, interviews, jobs and daily proof from one private mentor dashboard.</p>
       <div className="loginProofGrid">
         <span>Email OTP Verification</span><span>Mandatory Profile</span><span>Secure Password</span><span>Private Dashboard</span>
@@ -172,31 +215,40 @@ export function Login() {
     </section>
     <section className="loginCard premiumLoginCard">
       <div className="logoBig">SF</div>
-      <h1>{mode === 'signup' ? 'Sign up with Email OTP' : 'Login to Career OS'}</h1>
-      <p>{mode === 'signup' ? 'Name, email, mobile number and password are mandatory. Signup completes only after OTP verification.' : 'Use your verified email and password to enter the private dashboard.'}</p>
+      <h1>{isSignup ? 'Sign up with Email OTP' : isForgot ? 'Forgot Password' : 'Login to Career OS'}</h1>
+      <p>{isSignup ? 'Name, email, mobile number and password are mandatory. Signup completes only after OTP verification.' : isForgot ? 'Enter your verified email, receive OTP, then create a new password.' : 'Use your verified email and password to enter the private dashboard.'}</p>
 
       <div className="loginOptions" style={{ justifyContent: 'center', gap: 10 }}>
-        <button type="button" className={mode === 'login' ? 'btn cyan' : 'btn ghost'} onClick={() => { setMode('login'); setStatus(''); }}>Login</button>
-        <button type="button" className={mode === 'signup' ? 'btn cyan' : 'btn ghost'} onClick={() => { setMode('signup'); setStatus(''); }}>Sign Up</button>
+        <button type="button" className={mode === 'login' ? 'btn cyan' : 'btn ghost'} onClick={() => switchMode('login')}>Login</button>
+        <button type="button" className={mode === 'signup' ? 'btn cyan' : 'btn ghost'} onClick={() => switchMode('signup')}>Sign Up</button>
       </div>
 
-      {mode === 'signup' && <Field label="Full Name *" value={form.name} onChange={v => setValue('name', v)} />}
+      {isSignup && <Field label="Full Name *" value={form.name} onChange={v => setValue('name', v)} />}
       <Field label="Email *" value={form.email} onChange={v => setValue('email', v)} />
-      {mode === 'signup' && <Field label="Mobile Number *" value={form.mobile} onChange={v => setValue('mobile', v)} />}
-      <label className="field"><span>Password *</span><div className="passwordField"><input type={show ? 'text' : 'password'} value={form.password} onChange={e => setValue('password', e.target.value)} placeholder="Minimum 6 characters"/><button type="button" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button></div></label>
+      {isSignup && <Field label="Mobile Number *" value={form.mobile} onChange={v => setValue('mobile', v)} />}
 
-      {mode === 'signup' && otpSent && <Field label="Email OTP *" value={form.otp} onChange={v => setValue('otp', v)} />}
+      {!isForgot && <label className="field"><span>Password *</span><div className="passwordField"><input type={show ? 'text' : 'password'} value={form.password} onChange={e => setValue('password', e.target.value)} placeholder="Minimum 6 characters"/><button type="button" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button></div></label>}
+      {isForgot && otpSent && <>
+        <Field label="Reset OTP *" value={form.otp} onChange={v => setValue('otp', v)} />
+        <label className="field"><span>New Password *</span><div className="passwordField"><input type={show ? 'text' : 'password'} value={form.newPassword} onChange={e => setValue('newPassword', e.target.value)} placeholder="Minimum 6 characters"/><button type="button" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button></div></label>
+      </>}
+      {isSignup && otpSent && <Field label="Email OTP *" value={form.otp} onChange={v => setValue('otp', v)} />}
       {devOtp && <p className="hint">Local testing OTP: <b>{devOtp}</b>. Configure SMTP to send real email.</p>}
       {status && <p className="hint">{status}</p>}
 
       {mode === 'login' && <>
-        <div className="loginOptions"><label><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/> Remember me</label><button type="button">Forgot password?</button></div>
+        <div className="loginOptions"><label><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/> Remember me</label><button type="button" onClick={() => switchMode('forgot')}>Forgot password?</button></div>
         <button className="btn cyan full" disabled={busy} onClick={login}>{busy ? 'Checking...' : 'Enter Dashboard'}</button>
       </>}
 
-      {mode === 'signup' && <>
+      {isSignup && <>
         <div className="loginOptions"><label><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/> Remember me</label><button type="button" onClick={requestOtp} disabled={busy}>{otpSent ? 'Resend OTP' : 'Send OTP'}</button></div>
         {!otpSent ? <button className="btn cyan full" disabled={busy} onClick={requestOtp}>{busy ? 'Sending OTP...' : 'Send OTP to Email'}</button> : <button className="btn cyan full" disabled={busy} onClick={verifyOtp}>{busy ? 'Verifying...' : 'Verify OTP & Create Account'}</button>}
+      </>}
+
+      {isForgot && <>
+        <div className="loginOptions"><button type="button" onClick={() => switchMode('login')}>Back to login</button><button type="button" onClick={forgotPassword} disabled={busy}>{otpSent ? 'Resend OTP' : 'Send Reset OTP'}</button></div>
+        {!otpSent ? <button className="btn cyan full" disabled={busy} onClick={forgotPassword}>{busy ? 'Sending OTP...' : 'Send Reset OTP'}</button> : <button className="btn cyan full" disabled={busy} onClick={resetPassword}>{busy ? 'Resetting...' : 'Reset Password'}</button>}
       </>}
 
       <Link className="btn ghost full" to="/portfolio">View Public Job Portfolio</Link>
