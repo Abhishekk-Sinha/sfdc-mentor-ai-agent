@@ -168,12 +168,14 @@ export function NotificationCenter() {
 
 export function LearningHeatmap() {
   const activeDay = getActiveDay();
-  const [selectedDay, setSelectedDay] = React.useState(activeDay);
+  const [selectedDay, setSelectedDay] = React.useState(Math.min(activeDay, 45));
+  const [statusFilter, setStatusFilter] = React.useState('All');
+  const [rangeFilter, setRangeFilter] = React.useState(activeDay <= 15 ? '1-15' : activeDay <= 30 ? '16-30' : '31-45');
   const [notes, setNotes] = React.useState(() => readStore('learningCalendarNotes', {}));
   const [mentorDone, setMentorDone] = React.useState(() => readStore('mentorDone', {}));
   const [timeTasksByDay, setTimeTasksByDay] = React.useState(() => readStore('timeTasksByDay', {}));
+  const allDays = Array.from({ length: 45 }, (_, i) => i + 1);
   const selectedTopic = roadmap90[(selectedDay - 1) % roadmap90.length] || {};
-  const days = Array.from({ length: 45 }, (_, i) => i + 1);
   const getProof = day => {
     const taskDone = (timeTasksByDay[day] || []).filter(t => t.done).length;
     const routeDone = Object.keys(mentorDone).filter(k => k.startsWith(`${day}-`) && mentorDone[k]).length;
@@ -182,12 +184,27 @@ export function LearningHeatmap() {
     return { taskDone, routeDone, note, total };
   };
   const getStatus = total => total >= 4 ? 'Completed' : total >= 2 ? 'Partial' : total >= 1 ? 'Started' : 'Missed';
-  const studied = days.filter(day => getProof(day).total > 0).length;
-  const completed = days.filter(day => getProof(day).total >= 4).length;
-  const partial = days.filter(day => getProof(day).total > 0 && getProof(day).total < 4).length;
-  const missed = days.filter(day => getProof(day).total === 0).length;
+  const getRangeDays = () => {
+    if (rangeFilter === '1-15') return allDays.filter(day => day <= 15);
+    if (rangeFilter === '16-30') return allDays.filter(day => day >= 16 && day <= 30);
+    if (rangeFilter === '31-45') return allDays.filter(day => day >= 31 && day <= 45);
+    return allDays;
+  };
+  const filteredDays = getRangeDays().filter(day => statusFilter === 'All' || getStatus(getProof(day).total) === statusFilter);
+  const studied = allDays.filter(day => getProof(day).total > 0).length;
+  const completed = allDays.filter(day => getProof(day).total >= 4).length;
+  const partial = allDays.filter(day => getProof(day).total > 0 && getProof(day).total < 4).length;
+  const missed = allDays.filter(day => getProof(day).total === 0).length;
   const selectedProof = getProof(selectedDay);
   const selectedStatus = getStatus(selectedProof.total);
+  const completionPercent = Math.round((completed / 45) * 100);
+  const selectDay = value => {
+    const day = Math.max(1, Math.min(45, Number(value) || 1));
+    setSelectedDay(day);
+    if (day <= 15) setRangeFilter('1-15');
+    else if (day <= 30) setRangeFilter('16-30');
+    else setRangeFilter('31-45');
+  };
   const saveNote = value => {
     const next = { ...notes, [selectedDay]: value };
     if (!value.trim()) delete next[selectedDay];
@@ -211,6 +228,12 @@ export function LearningHeatmap() {
     writeStore('learningCalendarNotes', nextNotes);
     window.dispatchEvent(new Event('storage'));
   };
+  const markStarted = () => {
+    const nextNotes = { ...notes, [selectedDay]: notes[selectedDay] || `Day ${selectedDay} started: add what you studied here.` };
+    setNotes(nextNotes);
+    writeStore('learningCalendarNotes', nextNotes);
+    window.dispatchEvent(new Event('storage'));
+  };
   const clearDay = () => {
     const nextTasks = { ...timeTasksByDay };
     const nextNotes = { ...notes };
@@ -226,24 +249,34 @@ export function LearningHeatmap() {
     writeStore('mentorDone', nextMentor);
     window.dispatchEvent(new Event('storage'));
   };
-  return <Card title="Learning Proof Map" subtitle="Simple rule: select a day, save proof, and the color updates automatically.">
+  const nextMissedDay = allDays.find(day => getProof(day).total === 0) || 45;
+  const nextPartialDay = allDays.find(day => getProof(day).total > 0 && getProof(day).total < 4) || nextMissedDay;
+  return <Card title="Learning Proof Map" subtitle="Select Day 1 to Day 45, filter status, save proof, and track your real progress.">
+    <div className="proofControlPanel">
+      <label><span>Select Day</span><select value={selectedDay} onChange={e => selectDay(e.target.value)}>{allDays.map(day => <option key={day} value={day}>Day {day}</option>)}</select></label>
+      <label><span>Range</span><select value={rangeFilter} onChange={e => setRangeFilter(e.target.value)}><option>All</option><option>1-15</option><option>16-30</option><option>31-45</option></select></label>
+      <label><span>Status</span><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option>All</option><option>Completed</option><option>Partial</option><option>Started</option><option>Missed</option></select></label>
+      <button className="btn ghost" onClick={() => selectDay(activeDay)}>Today</button>
+      <button className="btn ghost" onClick={() => selectDay(nextPartialDay)}>Next Work</button>
+    </div>
     <div className="proofSummaryGrid">
       <div><b>{studied}/45</b><span>Studied</span></div>
       <div><b>{completed}</b><span>Completed</span></div>
       <div><b>{partial}</b><span>Partial</span></div>
       <div><b>{missed}</b><span>Missed</span></div>
     </div>
+    <div className="proofProgressPanel"><div><b>45-Day Proof Completion</b><span>{completionPercent}% completed</span></div><Progress value={completionPercent}/></div>
     <div className="proofMapLegend">
       <span className="done">Completed</span><span className="partial">Partial</span><span className="started">Started</span><span className="missed">Missed</span><span className="today">Today</span>
     </div>
     <div className="proofMapGrid">
-      {days.map(day => {
+      {filteredDays.length ? filteredDays.map(day => {
         const proof = getProof(day);
         const status = getStatus(proof.total).toLowerCase();
-        return <button key={day} className={`proofDayCell ${status} ${day === activeDay ? 'today' : ''} ${day === selectedDay ? 'selected' : ''}`} onClick={() => setSelectedDay(day)}>
+        return <button key={day} className={`proofDayCell ${status} ${day === activeDay ? 'today' : ''} ${day === selectedDay ? 'selected' : ''}`} onClick={() => selectDay(day)}>
           <b>{day}</b><span>{day === activeDay ? 'Today' : getStatus(proof.total)}</span>
         </button>;
-      })}
+      }) : <div className="emptyMiniState"><b>No days found</b><p>Change range or status filter to see days.</p></div>}
     </div>
     <div className="proofDetailPanel">
       <div className="proofDetailHead"><div><b>Day {selectedDay}: {selectedStatus}</b><span>{selectedTopic.salesforce || 'Salesforce practice'}</span></div><strong>{selectedProof.total} proof</strong></div>
@@ -252,8 +285,13 @@ export function LearningHeatmap() {
         <span className={selectedProof.taskDone ? 'ok' : ''}>8-hour tasks: {selectedProof.taskDone}</span>
         <span className={selectedProof.note ? 'ok' : ''}>Day note: {selectedProof.note ? 'Saved' : 'Not saved'}</span>
       </div>
+      <div className="proofTopicGrid">
+        <div><b>Salesforce</b><span>{selectedTopic.salesforce || 'Practice topic'}</span></div>
+        <div><b>DSA</b><span>{selectedTopic.dsa || 'Daily DSA pattern'}</span></div>
+        <div><b>System Design</b><span>{selectedTopic.systemDesign || 'Design concept'}</span></div>
+      </div>
       <textarea value={notes[selectedDay] || ''} onChange={e => saveNote(e.target.value)} placeholder="Example: Studied Apex trigger basics, solved 1 DSA problem, saved 1 interview answer..." />
-      <div className="proofActions"><button className="btn cyan" onClick={markCompleted}>Mark Day Completed</button><button className="btn ghost" onClick={clearDay}>Clear This Day</button><Link className="btn ghost" to="/time-tracker">Open Time Tracker</Link></div>
+      <div className="proofActions"><button className="btn cyan" onClick={markCompleted}>Mark Day Completed</button><button className="btn ghost" onClick={markStarted}>Mark Started</button><button className="btn ghost" onClick={clearDay}>Clear This Day</button><Link className="btn ghost" to="/time-tracker">Open Time Tracker</Link></div>
     </div>
   </Card>;
 }
