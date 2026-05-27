@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="2.6.0")
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.7.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 DB_PATH = Path(__file__).resolve().parent.parent / "mentor_storage.sqlite3"
@@ -99,6 +99,17 @@ def db():
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_signup_otps_email ON signup_otps(email)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_otps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            otp_hash TEXT NOT NULL,
+            expires_at REAL NOT NULL,
+            attempts INTEGER DEFAULT 0,
+            created_at REAL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_password_reset_otps_email ON password_reset_otps(email)")
     conn.commit()
     return conn
 
@@ -166,6 +177,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str
+
+
 def validate_signup(req: SignupOtpRequest):
     name = clean_text(req.name)
     email = normalize_email(req.email)
@@ -182,23 +203,25 @@ def validate_signup(req: SignupOtpRequest):
     return name, email, mobile, password
 
 
-def send_otp_email(email: str, name: str, otp: str) -> bool:
+def send_otp_email(email: str, name: str, otp: str, purpose: str = "signup") -> bool:
     smtp_host = os.getenv("SMTP_HOST", "").strip()
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER", "").strip()
     smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
     mail_from = os.getenv("MAIL_FROM", smtp_user or "no-reply@sfdcmentor.local").strip()
     if not smtp_host or not smtp_user or not smtp_password:
-        print(f"[DEV SIGNUP OTP] {email} -> {otp}")
+        print(f"[DEV {purpose.upper()} OTP] {email} -> {otp}")
         return False
 
+    subject = "Your SFDC Mentor signup OTP" if purpose == "signup" else "Your SFDC Mentor password reset OTP"
+    action = "signup" if purpose == "signup" else "password reset"
     msg = EmailMessage()
-    msg["Subject"] = "Your SFDC Mentor signup OTP"
+    msg["Subject"] = subject
     msg["From"] = mail_from
     msg["To"] = email
-    msg.set_content(f"""Hi {name},
+    msg.set_content(f"""Hi {name or 'there'},
 
-Your SFDC Mentor Career OS signup OTP is: {otp}
+Your SFDC Mentor Career OS {action} OTP is: {otp}
 
 This OTP is valid for {OTP_TTL_SECONDS // 60} minutes.
 Do not share it with anyone.
@@ -220,7 +243,7 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "mentor-backend", "mode": "free local + sqlite + auth otp + ollama + search-links", "version": "2.6.0", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
+    return {"ok": True, "service": "mentor-backend", "mode": "free local + sqlite + auth otp + password reset + ollama + search-links", "version": "2.7.0", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
 
 
 @app.post("/api/auth/request-signup-otp")
@@ -237,7 +260,7 @@ def request_signup_otp(req: SignupOtpRequest):
     conn.execute("INSERT INTO signup_otps(email,otp_hash,name,mobile,password_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?,?,0,?)", (email, hash_otp(otp), name, mobile, hash_password(password), expires_at, now_ts()))
     conn.commit()
     conn.close()
-    sent = send_otp_email(email, name, otp)
+    sent = send_otp_email(email, name, otp, "signup")
     response = {"ok": True, "message": "OTP sent to your email. Verify OTP to complete signup.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent}
     if not sent:
         response["dev_otp"] = otp
@@ -295,6 +318,68 @@ def auth_login(req: LoginRequest):
     if int(row["is_verified"] or 0) != 1:
         raise HTTPException(status_code=403, detail="Please verify your email before login.")
     return {"ok": True, "message": "Login successful.", "user": {"name": row["name"], "email": row["email"], "mobile": row["mobile"], "type": "user", "verified": True}}
+
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(req: ForgotPasswordRequest):
+    email = normalize_email(req.email)
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is mandatory.")
+    conn = db()
+    user = conn.execute("SELECT name, email, is_verified FROM users WHERE email=?", (email,)).fetchone()
+    if not user or int(user["is_verified"] or 0) != 1:
+        conn.close()
+        raise HTTPException(status_code=404, detail="No verified account found with this email.")
+    otp = f"{random.randint(100000, 999999)}"
+    expires_at = now_ts() + OTP_TTL_SECONDS
+    conn.execute("DELETE FROM password_reset_otps WHERE email=?", (email,))
+    conn.execute("INSERT INTO password_reset_otps(email,otp_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?)", (email, hash_otp(otp), expires_at, 0, now_ts()))
+    conn.commit()
+    conn.close()
+    sent = send_otp_email(email, user["name"], otp, "password reset")
+    response = {"ok": True, "message": "Password reset OTP sent to your email.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent}
+    if not sent:
+        response["dev_otp"] = otp
+        response["message"] = "SMTP is not configured. For local testing, use the reset OTP shown here and in backend terminal."
+    return response
+
+
+@app.post("/api/auth/reset-password")
+def reset_password(req: ResetPasswordRequest):
+    email = normalize_email(req.email)
+    otp = clean_text(req.otp)
+    new_password = req.new_password or ""
+    if not email or not otp or not new_password:
+        raise HTTPException(status_code=400, detail="Email, OTP and new password are mandatory.")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
+    conn = db()
+    row = conn.execute("SELECT * FROM password_reset_otps WHERE email=? ORDER BY created_at DESC LIMIT 1", (email,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Reset OTP not found. Please request a new OTP.")
+    if now_ts() > float(row["expires_at"]):
+        conn.execute("DELETE FROM password_reset_otps WHERE email=?", (email,))
+        conn.commit()
+        conn.close()
+        raise HTTPException(status_code=400, detail="Reset OTP expired. Please request a new OTP.")
+    if int(row["attempts"] or 0) >= 5:
+        conn.close()
+        raise HTTPException(status_code=429, detail="Too many wrong attempts. Please request a new OTP.")
+    if not hmac.compare_digest(hash_otp(otp), row["otp_hash"]):
+        conn.execute("UPDATE password_reset_otps SET attempts=attempts+1 WHERE id=?", (row["id"],))
+        conn.commit()
+        conn.close()
+        raise HTTPException(status_code=400, detail="Invalid reset OTP.")
+    user = conn.execute("SELECT id, name, email, mobile FROM users WHERE email=? AND is_verified=1", (email,)).fetchone()
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="No verified account found with this email.")
+    conn.execute("UPDATE users SET password_hash=?, updated_at=? WHERE email=?", (hash_password(new_password), now_ts(), email))
+    conn.execute("DELETE FROM password_reset_otps WHERE email=?", (email,))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "message": "Password reset successful. You can login with your new password.", "user": {"name": user["name"], "email": user["email"], "mobile": user["mobile"], "type": "user", "verified": True}}
 
 
 @app.post("/api/items")
