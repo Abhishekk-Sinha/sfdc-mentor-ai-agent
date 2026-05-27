@@ -4,6 +4,10 @@ import { Card, Progress } from './UI';
 import { readStore, writeStore, downloadText } from '../utils/storage';
 import { roadmap90 } from '../data/roadmap';
 
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:8000'
+  : 'https://sfdc-mentor-backend.onrender.com';
+
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -16,6 +20,10 @@ function getSavedAnswerCount() {
     if (value && typeof value === 'object') return count + Object.values(value).filter(answer => String(answer?.text || answer || '').trim().length > 20).length;
     return count;
   }, 0);
+}
+
+function getActiveDay() {
+  return Number(readStore('mentorDay', 0)) || Number(readStore('focusDay', 0)) || Number(readStore('timeCurrentDay', 0)) || 1;
 }
 
 function useLiveData() {
@@ -31,7 +39,7 @@ function useLiveData() {
   const weeklyResults = readStore('weeklyResults', {});
   const notes = readStore('notes', []);
   const documents = readStore('documents', []);
-  const activeDay = Number(readStore('mentorDay', 0)) || Number(readStore('focusDay', 0)) || 1;
+  const activeDay = getActiveDay();
   return {
     tick,
     activeDay,
@@ -48,7 +56,7 @@ function useLiveData() {
 export function ProfessionalOnboarding() {
   const [role, setRole] = React.useState(() => readStore('targetRole', 'Salesforce Developer'));
   const [startDate, setStartDate] = React.useState(() => readStore('learningStartDate', ''));
-  const [dailyTime, setDailyTime] = React.useState(() => readStore('dailyStudyTime', '90'));
+  const [dailyTime, setDailyTime] = React.useState(() => readStore('dailyStudyTime', '480'));
   const [hidden, setHidden] = React.useState(() => readStore('onboardingComplete', false));
   if (hidden) return null;
   const save = () => {
@@ -75,8 +83,8 @@ export function BackendSyncStatus() {
     let alive = true;
     async function load() {
       try {
-        const h = await fetch('http://127.0.0.1:8000/api/health').then(r => r.json());
-        const o = await fetch('http://127.0.0.1:8000/api/ollama-status').then(r => r.json());
+        const h = await fetch(`${API_BASE}/api/health`).then(r => r.json());
+        const o = await fetch(`${API_BASE}/api/ollama-status`).then(r => r.json());
         if (alive) { setHealth(h); setOllama(o); }
       } catch {
         if (alive) { setHealth({ ok: false }); setOllama({ ok: false }); }
@@ -111,87 +119,147 @@ export function NextBestActionCard() {
 }
 
 export function NotificationCenter() {
-  const notifications = readStore('silentNotifications', []);
+  const data = useLiveData();
+  const [dismissed, setDismissed] = React.useState(() => readStore('dismissedNotifications', {}));
   const autoPlan = readStore('autoTodayPlan', []);
-  const interviewQuestion = readStore('autoInterviewQuestionOfDay', 'Save one interview answer today.');
-  const items = [
-    ...autoPlan.map(x => ({ text: x, type: 'Plan' })),
-    { text: interviewQuestion, type: 'Interview' },
-    ...notifications.slice(0, 4).map(x => ({ text: x.text || x, type: x.type || 'Notice' }))
-  ].slice(0, 7);
-  return <Card title="Notification Center" subtitle="Daily study, revision, interview and backup reminders.">
-    <div className="notificationStack">{items.map((item, index) => <div key={`${item.type}-${index}`}><b>{String(index + 1).padStart(2, '0')}</b><span><strong>{item.type}:</strong> {item.text}</span></div>)}</div>
+  const custom = readStore('silentNotifications', []);
+  const baseItems = [
+    { id: 'route', type: 'Today', priority: 'High', text: `Open Day ${data.activeDay} route and finish one visible output.`, to: '/mentor-route' },
+    data.weak > 0
+      ? { id: 'weak', type: 'Revision', priority: 'High', text: `Revise ${data.weak} weak topic(s) before learning new topics.`, to: '/focus' }
+      : { id: 'confidence', type: 'Skill', priority: 'Medium', text: 'After practice, mark one topic Weak or Strong.', to: '/practice' },
+    data.savedAnswers < 10
+      ? { id: 'answer', type: 'Interview', priority: 'High', text: 'Save one 60-second interview answer today.', to: '/interview' }
+      : { id: 'answer-polish', type: 'Interview', priority: 'Medium', text: 'Improve one saved answer with project impact and metrics.', to: '/interview' },
+    { id: 'proof', type: 'Proof', priority: 'High', text: 'Save proof in Learning Proof Map before closing the app.', to: '/dashboard' },
+    data.jobsApplied < 5
+      ? { id: 'job', type: 'Career', priority: 'Medium', text: 'Apply or follow up with at least 3 companies.', to: '/job-tracker' }
+      : { id: 'job-followup', type: 'Career', priority: 'Low', text: 'Update follow-up notes for active applications.', to: '/job-tracker' },
+    ...autoPlan.slice(0, 2).map((x, i) => ({ id: `plan-${i}`, type: 'Plan', priority: 'Medium', text: x, to: '/time-tracker' })),
+    ...custom.slice(0, 2).map((x, i) => ({ id: `custom-${i}`, type: x.type || 'Notice', priority: 'Low', text: x.text || x, to: '/dashboard' }))
+  ];
+  const items = baseItems.filter(item => !dismissed[`${todayKey()}-${item.id}`]).slice(0, 7);
+  const clearItem = id => {
+    const next = { ...dismissed, [`${todayKey()}-${id}`]: true };
+    setDismissed(next);
+    writeStore('dismissedNotifications', next);
+  };
+  const clearToday = () => {
+    const next = { ...dismissed };
+    baseItems.forEach(item => { next[`${todayKey()}-${item.id}`] = true; });
+    setDismissed(next);
+    writeStore('dismissedNotifications', next);
+  };
+  return <Card title="Smart Notifications" subtitle="Only useful reminders: what to do, why it matters, and where to go.">
+    <div className="notificationHeaderPro">
+      <div><b>{items.length}</b><span>Active reminders today</span></div>
+      <button className="btn ghost" onClick={clearToday}>Clear Today</button>
+    </div>
+    {items.length ? <div className="smartNotificationList">
+      {items.map(item => <div key={item.id} className={`smartNotice ${item.priority.toLowerCase()}`}>
+        <span>{item.priority}</span>
+        <div><b>{item.type}</b><p>{item.text}</p></div>
+        <Link to={item.to}>Open</Link>
+        <button onClick={() => clearItem(item.id)}>Done</button>
+      </div>)}
+    </div> : <div className="emptyMiniState"><b>All clear</b><p>No urgent notification left for today. Keep building proof.</p></div>}
   </Card>;
 }
 
 export function LearningHeatmap() {
-  const activeDay = Number(readStore('mentorDay', 0)) || Number(readStore('focusDay', 0)) || 1;
-  const notes = readStore('learningCalendarNotes', {});
-  const mentorDone = readStore('mentorDone', {});
-  const timeTasksByDay = readStore('timeTasksByDay', {});
-  const days = Array.from({ length: 42 }, (_, i) => i + 1);
-  const getProofCount = day => {
+  const activeDay = getActiveDay();
+  const [selectedDay, setSelectedDay] = React.useState(activeDay);
+  const [notes, setNotes] = React.useState(() => readStore('learningCalendarNotes', {}));
+  const [mentorDone, setMentorDone] = React.useState(() => readStore('mentorDone', {}));
+  const [timeTasksByDay, setTimeTasksByDay] = React.useState(() => readStore('timeTasksByDay', {}));
+  const selectedTopic = roadmap90[(selectedDay - 1) % roadmap90.length] || {};
+  const days = Array.from({ length: 45 }, (_, i) => i + 1);
+  const getProof = day => {
     const taskDone = (timeTasksByDay[day] || []).filter(t => t.done).length;
     const routeDone = Object.keys(mentorDone).filter(k => k.startsWith(`${day}-`) && mentorDone[k]).length;
     const note = notes[day] ? 1 : 0;
-    return taskDone + routeDone + note;
+    const total = taskDone + routeDone + note;
+    return { taskDone, routeDone, note, total };
   };
-  const getStatus = count => count >= 4 ? 'Completed' : count >= 2 ? 'Partial' : count >= 1 ? 'Started' : 'No proof';
-  const getCellStyle = (day, count) => {
-    const isToday = day === activeDay;
-    const background = count >= 4
-      ? 'linear-gradient(135deg,#22c55e,#35d4ef)'
-      : count >= 2
-        ? 'linear-gradient(135deg,#0e7490,#2563eb)'
-        : count >= 1
-          ? 'linear-gradient(135deg,#334155,#0f766e)'
-          : '#0b1220';
-    return {
-      minHeight: 58,
-      borderRadius: 16,
-      border: isToday ? '2px solid #facc15' : '1px solid #253247',
-      background,
-      color: count >= 3 ? '#00111a' : '#eaf2ff',
-      display: 'grid',
-      placeItems: 'center',
-      padding: 8,
-      boxShadow: isToday ? '0 0 0 4px rgba(250,204,21,.15)' : '0 12px 28px rgba(0,0,0,.18)',
-      fontWeight: 900,
-      textAlign: 'center',
-    };
+  const getStatus = total => total >= 4 ? 'Completed' : total >= 2 ? 'Partial' : total >= 1 ? 'Started' : 'Missed';
+  const studied = days.filter(day => getProof(day).total > 0).length;
+  const completed = days.filter(day => getProof(day).total >= 4).length;
+  const partial = days.filter(day => getProof(day).total > 0 && getProof(day).total < 4).length;
+  const missed = days.filter(day => getProof(day).total === 0).length;
+  const selectedProof = getProof(selectedDay);
+  const selectedStatus = getStatus(selectedProof.total);
+  const saveNote = value => {
+    const next = { ...notes, [selectedDay]: value };
+    if (!value.trim()) delete next[selectedDay];
+    setNotes(next);
+    writeStore('learningCalendarNotes', next);
+    window.dispatchEvent(new Event('storage'));
   };
-  const studied = days.filter(day => getProofCount(day) > 0).length;
-  const completed = days.filter(day => getProofCount(day) >= 4).length;
-  const partial = days.filter(day => getProofCount(day) > 0 && getProofCount(day) < 4).length;
-  return <Card title="Learning Proof Map" subtitle="Professional 42-day view of studied, partial and missed learning days.">
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 12, marginBottom: 16 }}>
-      <div className="stat"><p>Studied Days</p><b>{studied}/42</b><small>Any proof saved</small></div>
-      <div className="stat"><p>Completed Days</p><b>{completed}</b><small>Strong proof days</small></div>
-      <div className="stat"><p>Partial Days</p><b>{partial}</b><small>Need completion</small></div>
+  const markCompleted = () => {
+    const tasks = [
+      'Salesforce Core Study', 'DSA Practice', 'System Design Practice', 'Project Proof', 'Interview Answer', 'Revision + Job Tracker'
+    ].map((title, index) => ({ id: `${selectedDay}-${index}`, title, done: true }));
+    const nextTasks = { ...timeTasksByDay, [selectedDay]: tasks };
+    const nextMentor = { ...mentorDone };
+    for (let i = 0; i < 4; i += 1) nextMentor[`${selectedDay}-${i}`] = true;
+    const nextNotes = { ...notes, [selectedDay]: notes[selectedDay] || `Day ${selectedDay} proof saved: completed study blocks and route tasks.` };
+    setTimeTasksByDay(nextTasks);
+    setMentorDone(nextMentor);
+    setNotes(nextNotes);
+    writeStore('timeTasksByDay', nextTasks);
+    writeStore('mentorDone', nextMentor);
+    writeStore('learningCalendarNotes', nextNotes);
+    window.dispatchEvent(new Event('storage'));
+  };
+  const clearDay = () => {
+    const nextTasks = { ...timeTasksByDay };
+    const nextNotes = { ...notes };
+    const nextMentor = { ...mentorDone };
+    delete nextTasks[selectedDay];
+    delete nextNotes[selectedDay];
+    Object.keys(nextMentor).forEach(key => { if (key.startsWith(`${selectedDay}-`)) delete nextMentor[key]; });
+    setTimeTasksByDay(nextTasks);
+    setNotes(nextNotes);
+    setMentorDone(nextMentor);
+    writeStore('timeTasksByDay', nextTasks);
+    writeStore('learningCalendarNotes', nextNotes);
+    writeStore('mentorDone', nextMentor);
+    window.dispatchEvent(new Event('storage'));
+  };
+  return <Card title="Learning Proof Map" subtitle="Simple rule: select a day, save proof, and the color updates automatically.">
+    <div className="proofSummaryGrid">
+      <div><b>{studied}/45</b><span>Studied</span></div>
+      <div><b>{completed}</b><span>Completed</span></div>
+      <div><b>{partial}</b><span>Partial</span></div>
+      <div><b>{missed}</b><span>Missed</span></div>
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(64px,1fr))', gap: 10 }}>
+    <div className="proofMapLegend">
+      <span className="done">Completed</span><span className="partial">Partial</span><span className="started">Started</span><span className="missed">Missed</span><span className="today">Today</span>
+    </div>
+    <div className="proofMapGrid">
       {days.map(day => {
-        const count = getProofCount(day);
-        const topic = roadmap90[(day - 1) % roadmap90.length]?.salesforce || 'Salesforce practice';
-        return <div key={day} style={getCellStyle(day, count)} title={`Day ${day}: ${getStatus(count)} | Proof items: ${count} | ${topic}`}>
-          <span style={{ display: 'block', fontSize: 15 }}>Day {day}</span>
-          <small style={{ color: 'inherit', opacity: .9 }}>{day === activeDay ? 'Today' : getStatus(count)}</small>
-        </div>;
+        const proof = getProof(day);
+        const status = getStatus(proof.total).toLowerCase();
+        return <button key={day} className={`proofDayCell ${status} ${day === activeDay ? 'today' : ''} ${day === selectedDay ? 'selected' : ''}`} onClick={() => setSelectedDay(day)}>
+          <b>{day}</b><span>{day === activeDay ? 'Today' : getStatus(proof.total)}</span>
+        </button>;
       })}
     </div>
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-      <span className="pill">No proof = missed</span>
-      <span className="pill">Started = 1 proof</span>
-      <span className="pill">Partial = 2-3 proofs</span>
-      <span className="pill">Completed = 4+ proofs</span>
-      <span className="pill">Yellow border = today</span>
+    <div className="proofDetailPanel">
+      <div className="proofDetailHead"><div><b>Day {selectedDay}: {selectedStatus}</b><span>{selectedTopic.salesforce || 'Salesforce practice'}</span></div><strong>{selectedProof.total} proof</strong></div>
+      <div className="proofChecklist">
+        <span className={selectedProof.routeDone ? 'ok' : ''}>Route tasks: {selectedProof.routeDone}</span>
+        <span className={selectedProof.taskDone ? 'ok' : ''}>8-hour tasks: {selectedProof.taskDone}</span>
+        <span className={selectedProof.note ? 'ok' : ''}>Day note: {selectedProof.note ? 'Saved' : 'Not saved'}</span>
+      </div>
+      <textarea value={notes[selectedDay] || ''} onChange={e => saveNote(e.target.value)} placeholder="Example: Studied Apex trigger basics, solved 1 DSA problem, saved 1 interview answer..." />
+      <div className="proofActions"><button className="btn cyan" onClick={markCompleted}>Mark Day Completed</button><button className="btn ghost" onClick={clearDay}>Clear This Day</button><Link className="btn ghost" to="/time-tracker">Open Time Tracker</Link></div>
     </div>
-    <p className="hint">This map becomes brighter when you complete route tasks, save day notes, or finish time-tracker tasks. It is proof-based, so it stays honest and professional.</p>
   </Card>;
 }
 
 export function JourneyTimeline() {
-  const activeDay = Number(readStore('mentorDay', 0)) || 1;
+  const activeDay = getActiveDay();
   const milestones = [
     ['Day 1', 'Foundation', 1], ['Day 30', 'Core Developer', 30], ['Day 60', 'Interview Ready', 60], ['Day 90', 'Job Ready', 90]
   ];
