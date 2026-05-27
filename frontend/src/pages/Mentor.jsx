@@ -1,30 +1,45 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Hero, Layout, Page, Progress } from '../components/UI';
-import { roadmap90 } from '../data/roadmap';
+import { ROADMAP_DAYS, dailyEightHourRoutine, roadmap90 } from '../data/roadmap';
 import { questionBank } from '../data/questions';
 import { readStore, writeStore, downloadText } from '../utils/storage';
 
 export function MentorRoute() {
-  const [day,setDay]=React.useState(()=>readStore('mentorDay',1)); const d=roadmap90[day-1]||roadmap90[0]; const [done,setDone]=React.useState(()=>readStore('mentorDone',{}));
+  const [day,setDay]=React.useState(()=>Math.max(1,Math.min(ROADMAP_DAYS,Number(readStore('mentorDay',1))||1)));
+  const d=roadmap90[day-1]||roadmap90[0];
+  const [done,setDone]=React.useState(()=>readStore('mentorDone',{}));
   const toggle=k=>{const n={...done,[`${day}-${k}`]:!done[`${day}-${k}`]};setDone(n);writeStore('mentorDone',n);writeStore('mentorDay',day)};
-  const tasks=[['Salesforce',d.salesforce],['DSA',d.dsa],['System Design',d.systemDesign],['English',`Day ${d.englishDay}`],['Project',d.projectTask],['Interview',d.interviewTask]];
+  const tasks=[
+    ['Salesforce Core',`${d.salesforce} — 1h 30m concept + notes`],
+    ['DSA 1 Hour',`${d.dsa} — solve one problem and write complexity`],
+    ['System Design 1 Hour',`${d.systemDesign} — concept, diagram thinking and trade-offs`],
+    ['Hands-on Build','1h Flow/Apex/LWC implementation practice'],
+    ['Project Proof',d.projectTask],
+    ['Question Bank','1h: solve 5 questions and save one answer'],
+    ['Interview Output',d.interviewTask],
+    ['Revision + Proof Map','30m: mark Weak/Strong, note result and verify Learning Proof Map']
+  ];
   const percent=tasks.filter(([k])=>done[`${day}-${k}`]).length/tasks.length*100;
-  return <Layout><Page><Hero title="90-Day Zero to Hero Mentor Route" subtitle="Daily Salesforce + DSA + English + System Design + Project + Interview task."><div className="scoreMini"><b>Day {day}</b><Progress value={percent}/></div></Hero><Card title="Choose Day"><div className="row"><input type="range" min="1" max="90" value={day} onChange={e=>setDay(Number(e.target.value))}/><input type="number" min="1" max="90" value={day} onChange={e=>setDay(Number(e.target.value))}/></div></Card><div className="taskGrid">{tasks.map(([k,v])=><button key={k} className={done[`${day}-${k}`]?'taskDone taskCard':'taskCard'} onClick={()=>toggle(k)}><b>{k}</b><span>{v}</span><small>{done[`${day}-${k}`]?'Completed':'Click to complete'}</small></button>)}</div></Page></Layout>;
+  return <Layout><Page><Hero title="45-Day Basic to Advanced Mentor Route" subtitle="Daily 8 hours: Salesforce + DSA 1h + System Design 1h + project + interview + proof map."><div className="scoreMini"><b>Day {day}/{ROADMAP_DAYS}</b><Progress value={percent}/><small>{d.phase}</small></div></Hero>
+    <Card title="Choose Day" subtitle="Har day ka routine alag save hota hai. Complete task par click karo, app offline hone par bhi local browser me saved rahega."><div className="row"><input type="range" min="1" max={ROADMAP_DAYS} value={day} onChange={e=>{const v=Number(e.target.value);setDay(v);writeStore('mentorDay',v)}}/><input type="number" min="1" max={ROADMAP_DAYS} value={day} onChange={e=>{const v=Math.max(1,Math.min(ROADMAP_DAYS,Number(e.target.value)||1));setDay(v);writeStore('mentorDay',v)}}/><span className="pill">{d.phase}</span></div></Card>
+    <Card title="Daily 8-Hour Time Split" subtitle="DSA aur System Design dono daily 1 hour mandatory hain."><div className="toolGrid">{dailyEightHourRoutine.map(block=><div className="toolTile" key={block.block}><b>{block.time} • {block.block}</b><span>{block.detail}</span></div>)}</div></Card>
+    <div className="taskGrid">{tasks.map(([k,v])=><button key={k} className={done[`${day}-${k}`]?'taskDone taskCard':'taskCard'} onClick={()=>toggle(k)}><b>{k}</b><span>{v}</span><small>{done[`${day}-${k}`]?'Completed':'Click to complete'}</small></button>)}</div>
+  </Page></Layout>;
 }
 
 export function FocusMode() {
-  const [day,setDay]=React.useState(()=>readStore('focusDay',1)); const [answers,setAnswers]=React.useState(()=>readStore('focusAnswers',{})); const [weakStrong,setWeakStrong]=React.useState(()=>readStore('weakStrong',{}));
+  const [day,setDay]=React.useState(()=>Math.max(1,Math.min(ROADMAP_DAYS,Number(readStore('focusDay',1))||1))); const [answers,setAnswers]=React.useState(()=>readStore('focusAnswers',{})); const [weakStrong,setWeakStrong]=React.useState(()=>readStore('weakStrong',{}));
   const route=roadmap90[(day-1)%roadmap90.length]; const qs=questionBank.filter(q=>[route.salesforce,route.dsa,route.systemDesign].includes(q.topic)).slice(0,20);
   const save=(id,text)=>{const n={...answers,[id]:{text,savedAt:new Date().toLocaleString(),status:'Saved'}};setAnswers(n);writeStore('focusAnswers',n)};
   const mark=(id,status)=>{const n={...weakStrong,[id]:status};setWeakStrong(n);writeStore('weakStrong',n)};
   const del=(id)=>{const n={...answers}; delete n[id]; setAnswers(n); writeStore('focusAnswers',n); const w={...weakStrong}; delete w[id]; setWeakStrong(w)};
-  return <Layout><Page><Hero title="Focus Mode" subtitle=""><div className="row"><input type="number" min="1" max="90" value={day} onChange={e=>setDay(Number(e.target.value))}/><span className="pill">{route.phase}</span></div></Hero><Card title="Today's Motivation"><p className="motivation">Great dreams of great dreamers are always transcended. Aaj ek answer save karo, ek topic strong mark karo, aur ek doubt clear karo.</p></Card><div className="listGap">{qs.length ? qs.map((q,i)=><Card key={q.id} title={`${i+1}. ${q.title}`} subtitle={`${q.track} • ${q.topic}`} action={<a className="btn small ghost" href={q.link} target="_blank">Open Link</a>}><p>{q.question}</p><textarea className="answerBox" value={answers[q.id]?.text||''} onChange={e=>save(q.id,e.target.value)} placeholder="Write answer here"/><div className="answerMeta"><span className="pill">{answers[q.id]?.status || 'Not saved'}</span><span className="pill">{weakStrong[q.id]||'Not marked'}</span><small>{answers[q.id]?.savedAt}</small></div><div className="row"><button className="btn cyan" onClick={()=>save(q.id,answers[q.id]?.text||'My focus answer saved.')}>Save</button><button className="btn ghost" onClick={()=>mark(q.id,'Weak')}>Weak</button><button className="btn ghost" onClick={()=>mark(q.id,'Strong')}>Strong</button><button className="btn danger" onClick={()=>del(q.id)}>Delete</button></div></Card>) : <Card title="No exact questions found"><p>Open Practice Lab for more topic-wise questions.</p><Link className="btn" to="/practice">Practice Lab</Link></Card>}</div></Page></Layout>;
+  return <Layout><Page><Hero title="Focus Mode" subtitle="45-day focused practice. DSA and System Design are daily mandatory."><div className="row"><input type="number" min="1" max={ROADMAP_DAYS} value={day} onChange={e=>setDay(Math.max(1,Math.min(ROADMAP_DAYS,Number(e.target.value)||1)))}/><span className="pill">{route.phase}</span><span className="pill">DSA 1h</span><span className="pill">System Design 1h</span></div></Hero><Card title="Today's Motivation"><p className="motivation">Aaj 8 hours ka proof banao: Salesforce, DSA, System Design, Project, Interview aur Revision. Sirf padhna nahi — save bhi karna hai.</p></Card><div className="listGap">{qs.length ? qs.map((q,i)=><Card key={q.id} title={`${i+1}. ${q.title}`} subtitle={`${q.track} • ${q.topic}`} action={<a className="btn small ghost" href={q.link} target="_blank">Open Link</a>}><p>{q.question}</p><textarea className="answerBox" value={answers[q.id]?.text||''} onChange={e=>save(q.id,e.target.value)} placeholder="Write answer here"/><div className="answerMeta"><span className="pill">{answers[q.id]?.status || 'Not saved'}</span><span className="pill">{weakStrong[q.id]||'Not marked'}</span><small>{answers[q.id]?.savedAt}</small></div><div className="row"><button className="btn cyan" onClick={()=>save(q.id,answers[q.id]?.text||'My focus answer saved.')}>Save</button><button className="btn ghost" onClick={()=>mark(q.id,'Weak')}>Weak</button><button className="btn ghost" onClick={()=>mark(q.id,'Strong')}>Strong</button><button className="btn danger" onClick={()=>del(q.id)}>Delete</button></div></Card>) : <Card title="No exact questions found"><p>Open Practice Lab for more topic-wise questions.</p><Link className="btn" to="/practice">Practice Lab</Link></Card>}</div></Page></Layout>;
 }
 
 export function LearningCoach() {
   const answers=readStore('answers',{}); const weak=readStore('weakStrong',{}); const weakCount=Object.values(weak).filter(x=>x==='Weak').length; const strongCount=Object.values(weak).filter(x=>x==='Strong').length;
-  return <Layout><Page><Hero title="Learning Coach" subtitle="Smart daily plan, sprint timer, mistake bank, quiz, recap, and LinkedIn proof generator."/><div className="grid2"><Card title="Smart Plan"><ol><li>Complete one 45-minute Salesforce sprint</li><li>Solve 2 DSA questions</li><li>Revise weak topics: {weakCount}</li><li>Convert one answer into interview proof</li></ol><Link className="btn cyan" to="/focus">Start Focus</Link></Card><Card title="Mistake Bank"><p>Saved answers: {Object.keys(answers).length}</p><p>Weak topics: {weakCount}</p><p>Strong topics: {strongCount}</p><p>Rule: revise weak topic after 1/3/7/15/30 days.</p></Card><Card title="Quiz Generator"><p>Use Practice Lab filters and answer 10 questions from one topic.</p><Link className="btn" to="/practice">Open Practice Lab</Link></Card><Card title="LinkedIn Proof Generator"><textarea placeholder="Today I learned... I practiced... My project proof is..."/><button className="btn">Save Draft</button></Card></div></Page></Layout>;
+  return <Layout><Page><Hero title="Learning Coach" subtitle="Smart daily 8-hour plan, sprint timer, mistake bank, quiz, recap, and LinkedIn proof generator."/><div className="grid2"><Card title="Smart 8-Hour Plan"><ol><li>Salesforce Core: 1h 30m concept + notes</li><li>DSA: 1 hour mandatory problem solving</li><li>System Design: 1 hour mandatory concept + trade-offs</li><li>Project build + Question Bank + Interview answer + Proof Map</li><li>Revise weak topics: {weakCount}</li></ol><Link className="btn cyan" to="/mentor-route">Open 45-Day Route</Link></Card><Card title="Mistake Bank"><p>Saved answers: {Object.keys(answers).length}</p><p>Weak topics: {weakCount}</p><p>Strong topics: {strongCount}</p><p>Rule: revise weak topic after 1/3/7/15/30 days.</p></Card><Card title="Quiz Generator"><p>Use Practice Lab filters and answer 10 questions from one topic.</p><Link className="btn" to="/practice">Open Practice Lab</Link></Card><Card title="LinkedIn Proof Generator"><textarea placeholder="Today I learned... I practiced... My project proof is..."/><button className="btn">Save Draft</button></Card></div></Page></Layout>;
 }
 
 const promptTemplates = [
@@ -32,7 +47,7 @@ const promptTemplates = [
   'Make this answer interview-ready in STAR format',
   'Generate Salesforce scenario questions from Flow and Security',
   'Review my DSA answer and give hint only',
-  'Create daily mentor plan for today',
+  'Create daily 8-hour mentor plan with DSA 1 hour and System Design 1 hour',
   'Convert my project into resume bullet points',
   'Explain this in Hinglish',
   'Generate follow-up interview questions'
