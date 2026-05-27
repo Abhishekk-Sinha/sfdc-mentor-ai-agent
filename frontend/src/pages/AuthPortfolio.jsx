@@ -4,6 +4,8 @@ import { cvSkills, experience, profile, projects } from '../data/profile';
 import { Card, Field, Page } from '../components/UI';
 import { readStore, writeStore } from '../utils/storage';
 
+const API_BASE = 'http://127.0.0.1:8000';
+
 const defaultPhoto = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420">
   <defs>
@@ -18,9 +20,20 @@ const defaultPhoto = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <text x="210" y="386" text-anchor="middle" font-family="Arial" font-size="34" font-weight="800" fill="#fff">AK</text>
 </svg>`)};`;
 
+async function apiPost(path, payload) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.detail || data?.message || 'Request failed');
+  return data;
+}
+
 async function syncPhotoToBackend(photo) {
   try {
-    await fetch('http://127.0.0.1:8000/api/items', {
+    await fetch(`${API_BASE}/api/items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'profilePhoto', type: 'profile', title: 'Profile Photo', data: photo })
@@ -32,7 +45,7 @@ async function syncPhotoToBackend(photo) {
 
 async function loadPhotoFromBackend() {
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/items?key=profilePhoto&limit=1');
+    const response = await fetch(`${API_BASE}/api/items?key=profilePhoto&limit=1`);
     const data = await response.json();
     const saved = data?.items?.[0]?.payload;
     if (typeof saved === 'string' && saved.startsWith('data:image')) return saved;
@@ -85,30 +98,109 @@ function useProfilePhoto() {
 export function Login() {
   const nav = useNavigate();
   const { photo } = useProfilePhoto();
+  const [mode, setMode] = React.useState('login');
   const [show, setShow] = React.useState(false);
   const [remember, setRemember] = React.useState(true);
-  const [form, setForm] = React.useState({ email: profile.email, password: '' });
-  const login = () => { writeStore('session', { name: profile.name, email: form.email, type: 'user', remember }); nav('/dashboard'); };
+  const [otpSent, setOtpSent] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [status, setStatus] = React.useState('');
+  const [devOtp, setDevOtp] = React.useState('');
+  const [form, setForm] = React.useState({ name: '', email: profile.email || '', mobile: '', password: '', otp: '' });
+
+  const setValue = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+  const finishSession = user => {
+    writeStore('session', { name: user.name, email: user.email, mobile: user.mobile, type: user.type || 'user', verified: true, remember });
+    nav('/dashboard');
+  };
+
+  const login = async () => {
+    setBusy(true);
+    setStatus('');
+    try {
+      const data = await apiPost('/api/auth/login', { email: form.email, password: form.password });
+      finishSession(data.user);
+    } catch (err) {
+      setStatus(err.message || 'Login failed. Please check email/password.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const requestOtp = async () => {
+    setBusy(true);
+    setStatus('');
+    setDevOtp('');
+    try {
+      const data = await apiPost('/api/auth/request-signup-otp', {
+        name: form.name,
+        email: form.email,
+        mobile: form.mobile,
+        password: form.password
+      });
+      setOtpSent(true);
+      setDevOtp(data.dev_otp || '');
+      setStatus(data.message || 'OTP sent to your email.');
+    } catch (err) {
+      setStatus(err.message || 'Could not send OTP.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    setBusy(true);
+    setStatus('');
+    try {
+      const data = await apiPost('/api/auth/verify-signup-otp', { email: form.email, otp: form.otp });
+      finishSession(data.user);
+    } catch (err) {
+      setStatus(err.message || 'OTP verification failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return <div className="loginPage premiumLoginPage">
     <section className="loginShowcase">
       <div className="loginPhotoFrame"><img src={photo} alt="Abhishek Kumar" /></div>
       <p className="eyebrow">Salesforce Career OS</p>
-      <h1>Welcome back, Abhishek</h1>
+      <h1>{mode === 'signup' ? 'Create verified account' : 'Welcome back, Abhishek'}</h1>
       <p>Track skills, answers, projects, interviews, jobs and daily proof from one private mentor dashboard.</p>
       <div className="loginProofGrid">
-        <span>90-Day Mentor Route</span><span>Focus Mode</span><span>Job Tracker</span><span>AI Mentor</span>
+        <span>Email OTP Verification</span><span>Mandatory Profile</span><span>Secure Password</span><span>Private Dashboard</span>
       </div>
     </section>
     <section className="loginCard premiumLoginCard">
       <div className="logoBig">SF</div>
-      <h1>Login to Career OS</h1>
-      <p>Private dashboard for learning, interview preparation, resume proof and Salesforce job tracking.</p>
-      <Field label="Email" value={form.email} onChange={v => setForm({ ...form, email: v })} />
-      <label className="field"><span>Password</span><div className="passwordField"><input type={show ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Enter anything for local demo"/><button type="button" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button></div></label>
-      <div className="loginOptions"><label><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/> Remember me</label><button type="button">Forgot password?</button></div>
-      <button className="btn cyan full" onClick={login}>Enter Dashboard</button>
+      <h1>{mode === 'signup' ? 'Sign up with Email OTP' : 'Login to Career OS'}</h1>
+      <p>{mode === 'signup' ? 'Name, email, mobile number and password are mandatory. Signup completes only after OTP verification.' : 'Use your verified email and password to enter the private dashboard.'}</p>
+
+      <div className="loginOptions" style={{ justifyContent: 'center', gap: 10 }}>
+        <button type="button" className={mode === 'login' ? 'btn cyan' : 'btn ghost'} onClick={() => { setMode('login'); setStatus(''); }}>Login</button>
+        <button type="button" className={mode === 'signup' ? 'btn cyan' : 'btn ghost'} onClick={() => { setMode('signup'); setStatus(''); }}>Sign Up</button>
+      </div>
+
+      {mode === 'signup' && <Field label="Full Name *" value={form.name} onChange={v => setValue('name', v)} />}
+      <Field label="Email *" value={form.email} onChange={v => setValue('email', v)} />
+      {mode === 'signup' && <Field label="Mobile Number *" value={form.mobile} onChange={v => setValue('mobile', v)} />}
+      <label className="field"><span>Password *</span><div className="passwordField"><input type={show ? 'text' : 'password'} value={form.password} onChange={e => setValue('password', e.target.value)} placeholder="Minimum 6 characters"/><button type="button" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button></div></label>
+
+      {mode === 'signup' && otpSent && <Field label="Email OTP *" value={form.otp} onChange={v => setValue('otp', v)} />}
+      {devOtp && <p className="hint">Local testing OTP: <b>{devOtp}</b>. Configure SMTP to send real email.</p>}
+      {status && <p className="hint">{status}</p>}
+
+      {mode === 'login' && <>
+        <div className="loginOptions"><label><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/> Remember me</label><button type="button">Forgot password?</button></div>
+        <button className="btn cyan full" disabled={busy} onClick={login}>{busy ? 'Checking...' : 'Enter Dashboard'}</button>
+      </>}
+
+      {mode === 'signup' && <>
+        <div className="loginOptions"><label><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/> Remember me</label><button type="button" onClick={requestOtp} disabled={busy}>{otpSent ? 'Resend OTP' : 'Send OTP'}</button></div>
+        {!otpSent ? <button className="btn cyan full" disabled={busy} onClick={requestOtp}>{busy ? 'Sending OTP...' : 'Send OTP to Email'}</button> : <button className="btn cyan full" disabled={busy} onClick={verifyOtp}>{busy ? 'Verifying...' : 'Verify OTP & Create Account'}</button>}
+      </>}
+
       <Link className="btn ghost full" to="/portfolio">View Public Job Portfolio</Link>
-      <div className="secureBadges"><span>Local data</span><span>Offline-first</span><span>Backup ready</span></div>
+      <div className="secureBadges"><span>Email verified</span><span>SQLite user store</span><span>OTP protected</span></div>
     </section>
   </div>;
 }
