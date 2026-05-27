@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="2.7.2")
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.8.0")
 ALLOWED_ORIGINS = [
     "https://abhishekk-sinha.github.io",
     "https://abhishekk-sinha.github.io/sfdc-mentor-ai-agent",
@@ -37,7 +37,8 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "240"))
 OTP_TTL_SECONDS = int(os.getenv("OTP_TTL_SECONDS", "600"))
 APP_SECRET = os.getenv("APP_SECRET", "sfdc-mentor-local-secret-change-me")
-LAST_SMTP_ERROR = ""
+LAST_EMAIL_ERROR = ""
+LAST_EMAIL_PROVIDER = "none"
 
 
 def now_ts() -> float:
@@ -217,45 +218,73 @@ def validate_signup(req: SignupOtpRequest):
     return name, email, mobile, password
 
 
-def send_otp_email(email: str, name: str, otp: str, purpose: str = "signup") -> bool:
-    global LAST_SMTP_ERROR
+def build_otp_email(name: str, otp: str, purpose: str):
+    subject = "Your Career OS signup OTP" if purpose == "signup" else "Your Career OS password reset OTP"
+    action = "signup" if purpose == "signup" else "password reset"
+    text = f"Hi {name or 'there'},\n\nYour Career OS {action} OTP is: {otp}\n\nThis OTP is valid for {OTP_TTL_SECONDS // 60} minutes. Do not share it with anyone.\n\nRegards,\nCareer OS Mentor"
+    html = f"<p>Hi {name or 'there'},</p><p>Your Career OS {action} OTP is:</p><h2>{otp}</h2><p>This OTP is valid for {OTP_TTL_SECONDS // 60} minutes. Do not share it with anyone.</p><p>Regards,<br/>Career OS Mentor</p>"
+    return subject, text, html
+
+
+def send_resend_email(to_email: str, name: str, otp: str, purpose: str) -> bool:
+    api_key = os.getenv("RESEND_API_KEY", "").strip()
+    if not api_key:
+        return False
+    mail_from = os.getenv("MAIL_FROM", "onboarding@resend.dev").strip() or "onboarding@resend.dev"
+    subject, text, html = build_otp_email(name, otp, purpose)
+    payload = json.dumps({"from": mail_from, "to": [to_email], "subject": subject, "html": html, "text": text}).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=25) as resp:
+        return 200 <= resp.status < 300
+
+
+def send_smtp_email(to_email: str, name: str, otp: str, purpose: str) -> bool:
     smtp_host = os.getenv("SMTP_HOST", "").strip()
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER", "").strip()
     smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
     mail_from = os.getenv("MAIL_FROM", smtp_user or "no-reply@sfdcmentor.local").strip()
     if not smtp_host or not smtp_user or not smtp_password:
-        LAST_SMTP_ERROR = "SMTP_HOST/SMTP_USER/SMTP_PASSWORD missing"
-        print(f"[DEV {purpose.upper()} OTP] {email} -> {otp}")
         return False
+    subject, text, _html = build_otp_email(name, otp, purpose)
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = mail_from
+    msg["To"] = to_email
+    msg.set_content(text)
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+    return True
+
+
+def send_otp_email(email: str, name: str, otp: str, purpose: str = "signup") -> bool:
+    global LAST_EMAIL_ERROR, LAST_EMAIL_PROVIDER
     try:
-        subject = "Your SFDC Mentor signup OTP" if purpose == "signup" else "Your SFDC Mentor password reset OTP"
-        action = "signup" if purpose == "signup" else "password reset"
-        msg = EmailMessage()
-        msg["Subject"] = subject
-        msg["From"] = mail_from
-        msg["To"] = email
-        msg.set_content(f"""Hi {name or 'there'},
-
-Your SFDC Mentor Career OS {action} OTP is: {otp}
-
-This OTP is valid for {OTP_TTL_SECONDS // 60} minutes.
-Do not share it with anyone.
-
-Regards,
-SFDC Mentor Career OS
-""")
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.send_message(msg)
-        LAST_SMTP_ERROR = ""
-        return True
+        if os.getenv("RESEND_API_KEY", "").strip():
+            LAST_EMAIL_PROVIDER = "resend"
+            if send_resend_email(email, name, otp, purpose):
+                LAST_EMAIL_ERROR = ""
+                return True
     except Exception as exc:
-        LAST_SMTP_ERROR = f"{type(exc).__name__}: {exc}"
-        print(f"[SMTP ERROR] {LAST_SMTP_ERROR}")
-        print(f"[DEV {purpose.upper()} OTP] {email} -> {otp}")
-        return False
+        LAST_EMAIL_ERROR = f"Resend {type(exc).__name__}: {exc}"
+        print(f"[RESEND ERROR] {LAST_EMAIL_ERROR}")
+    try:
+        LAST_EMAIL_PROVIDER = "smtp"
+        if send_smtp_email(email, name, otp, purpose):
+            LAST_EMAIL_ERROR = ""
+            return True
+    except Exception as exc:
+        LAST_EMAIL_ERROR = f"SMTP {type(exc).__name__}: {exc}"
+        print(f"[SMTP ERROR] {LAST_EMAIL_ERROR}")
+    print(f"[DEV {purpose.upper()} OTP] {email} -> {otp}")
+    return False
 
 
 @app.get("/")
@@ -265,7 +294,7 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "mentor-backend", "mode": "free local + sqlite + auth otp + password reset + ollama + search-links", "version": "2.7.2", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
+    return {"ok": True, "service": "mentor-backend", "mode": "sqlite + auth otp + password reset + resend/smtp + ollama + search-links", "version": "2.8.0", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
 
 
 @app.get("/api/cors-test")
@@ -277,12 +306,14 @@ def cors_test():
 def debug_smtp():
     return {
         "ok": True,
+        "resend_api_key": bool(os.getenv("RESEND_API_KEY", "").strip()),
         "smtp_host": bool(os.getenv("SMTP_HOST", "").strip()),
         "smtp_port": os.getenv("SMTP_PORT", "587"),
         "smtp_user": bool(os.getenv("SMTP_USER", "").strip()),
         "smtp_password": bool(os.getenv("SMTP_PASSWORD", "").strip()),
-        "mail_from": bool(os.getenv("MAIL_FROM", "").strip()),
-        "last_smtp_error": LAST_SMTP_ERROR,
+        "mail_from": os.getenv("MAIL_FROM", ""),
+        "last_email_provider": LAST_EMAIL_PROVIDER,
+        "last_email_error": LAST_EMAIL_ERROR,
     }
 
 
@@ -301,11 +332,11 @@ def request_signup_otp(req: SignupOtpRequest):
     conn.commit()
     conn.close()
     sent = send_otp_email(email, name, otp, "signup")
-    response = {"ok": True, "message": "OTP sent to your email. Verify OTP to complete signup.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent}
+    response = {"ok": True, "message": "OTP sent to your email. Verify OTP to complete signup.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent, "email_provider": LAST_EMAIL_PROVIDER}
     if not sent:
         response["dev_otp"] = otp
-        response["message"] = "Email SMTP failed or is not configured. Use the dev OTP shown here and in Render logs. Check /api/debug/smtp."
-        response["smtp_error"] = LAST_SMTP_ERROR
+        response["message"] = "Email sending failed. Use the dev OTP shown here and check /api/debug/smtp."
+        response["email_error"] = LAST_EMAIL_ERROR
     return response
 
 
@@ -378,11 +409,11 @@ def forgot_password(req: ForgotPasswordRequest):
     conn.commit()
     conn.close()
     sent = send_otp_email(email, user["name"], otp, "password reset")
-    response = {"ok": True, "message": "Password reset OTP sent to your email.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent}
+    response = {"ok": True, "message": "Password reset OTP sent to your email.", "email": email, "expires_in_seconds": OTP_TTL_SECONDS, "email_sent": sent, "email_provider": LAST_EMAIL_PROVIDER}
     if not sent:
         response["dev_otp"] = otp
-        response["message"] = "Email SMTP failed or is not configured. Use the reset OTP shown here and in Render logs. Check /api/debug/smtp."
-        response["smtp_error"] = LAST_SMTP_ERROR
+        response["message"] = "Email sending failed. Use the reset OTP shown here and check /api/debug/smtp."
+        response["email_error"] = LAST_EMAIL_ERROR
     return response
 
 
