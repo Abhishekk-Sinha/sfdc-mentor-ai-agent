@@ -5,19 +5,18 @@ import { roadmap90 } from '../data/roadmap';
 import { Layout, Page, Card, Stat, Progress } from '../components/UI';
 import { DashboardProfessionalSuite } from '../components/ProfessionalAddons';
 import { readStore, writeStore } from '../utils/storage';
-import { DASHBOARD_HERO_ACTIONS, PREMIUM_PATH_STEPS, QUICK_START_CARDS, TOOL_GROUPS } from '../config/dashboardConfig';
+import { QUICK_START_CARDS, TOOL_GROUPS } from '../config/dashboardConfig';
 
-// Counts all meaningful saved answers across mentor, practice, focus and interview modules.
 function getSavedAnswerCount() {
   const stores = ['answers', 'focusAnswers', 'interviewAnswers', 'interviewAnswersV2', 'weeklyAnswers', 'mentorLog'];
   return stores.reduce((count, key) => {
     const value = readStore(key, key === 'mentorLog' ? [] : {});
     if (Array.isArray(value)) return count + value.length;
-    return count + Object.values(value).filter(answer => String(answer?.text || answer || '').trim().length > 20).length;
+    if (value && typeof value === 'object') return count + Object.values(value).filter(answer => String(answer?.text || answer || '').trim().length > 20).length;
+    return count;
   }, 0);
 }
 
-// Job Ready Score is intentionally based on real saved work, not a fake static number.
 function calculateJobReadyScore({ tasks = [], savedAnswers = 0, weakStrong = {}, jobs = [], weeklyResults = {}, mentorDone = {} }) {
   const baseScore = 25;
   const completedTaskScore = Math.min(18, tasks.length ? (tasks.filter(task => task.done).length / Math.max(tasks.length, 1)) * 18 : 0);
@@ -71,8 +70,8 @@ function MomentumGraph({ score, savedAnswers, strong, applied, completedTasks = 
   const labels = ['Start', 'Practice', 'Strong', 'Work', 'Career', 'Ready'];
   const points = values.map((value, index) => `${18 + index * 44},${120 - value}`).join(' ');
   return <div className="momentumGraphCard">
-    <div className="momentumGraphHead"><div><b>Learning Momentum</b><span>Live trend from saved answers, tasks, strong topics and jobs</span></div><strong>{score}%</strong></div>
-    <svg viewBox="0 0 260 135" role="img" aria-label="Learning momentum graph">
+    <div className="momentumGraphHead"><div><b>Career Momentum</b><span>Live trend from real saved work</span></div><strong>{score}%</strong></div>
+    <svg viewBox="0 0 260 135" role="img" aria-label="Career momentum graph">
       <defs><linearGradient id="momentumLine" x1="0" x2="1"><stop offset="0%" stopColor="#35d4ef"/><stop offset="55%" stopColor="#22c55e"/><stop offset="100%" stopColor="#7c3aed"/></linearGradient></defs>
       <path d="M18 25 H238 M18 55 H238 M18 85 H238 M18 115 H238" className="graphGrid"/>
       <polyline points={points} className="graphLine"/>
@@ -82,72 +81,84 @@ function MomentumGraph({ score, savedAnswers, strong, applied, completedTasks = 
   </div>;
 }
 
-function DashboardHero({ score, activeDay, savedAnswers, strong, applied, completedTasks, totalTasks, routeDoneToday, weeklyResults }) {
+function DashboardHero(data) {
+  const { score, activeDay, savedAnswers, strong, applied, completedTasks, totalTasks, routeDoneToday, weeklyResults, today } = data;
   const heroStats = [
-    { label: 'Day', value: `Day ${activeDay}` },
-    { label: 'Saved', value: savedAnswers },
-    { label: 'Strong', value: strong },
-    { label: 'Jobs', value: applied },
+    { label: 'Current Sprint', value: `Day ${activeDay}` },
+    { label: 'Saved Answers', value: savedAnswers },
+    { label: 'Strong Topics', value: strong },
+    { label: 'Jobs Applied', value: applied },
   ];
-  return <section className="dashboardHeroPro">
+  return <section className="hero premiumHero dashboardHeroPro" style={{ alignItems: 'stretch' }}>
     <div className="dashboardHeroContent">
-      <p className="eyebrow">SFDC Mentor Career OS</p>
-      <h1>Home Guide</h1>
-      <p>Your professional command center for practice, AI guidance, interview preparation, job tracking and daily proof.</p>
+      <p className="eyebrow">Professional Home Guide</p>
+      <h1>Salesforce Career Command Center</h1>
+      <p>One clean daily dashboard for learning, interview preparation, project proof and job tracking. Follow the next action, save proof, and move your Job Ready score honestly.</p>
       <div className="dashboardHeroActions">
-        {DASHBOARD_HERO_ACTIONS.map(action => <Link key={action.label} className={action.className} to={action.to}>{action.label}</Link>)}
+        <Link className="btn cyan" to="/practice">Start Today's Practice</Link>
+        <Link className="btn ghost" to="/ai-mentor">Ask AI Mentor</Link>
+        <Link className="btn ghost" to="/job-tracker">Update Job Tracker</Link>
       </div>
+      <div className="heroMiniStats" style={{ marginTop: 18 }}>{heroStats.map(item => <div key={item.label}><b>{item.value}</b><span>{item.label}</span></div>)}</div>
     </div>
     <div className="dashboardScorePanel">
       <div className="scoreCircle"><b>{score}%</b><span>Job Ready</span></div>
+      <div className="scoreMini"><b>Today's Focus</b><p className="hint">{today.phase}</p><Progress value={score}/><small>Based on saved answers, tasks, topics, tests and job pipeline.</small></div>
       <MomentumGraph score={score} savedAnswers={savedAnswers} strong={strong} applied={applied} completedTasks={completedTasks} totalTasks={totalTasks} routeDoneToday={routeDoneToday} weeklyResults={weeklyResults} />
-      <div className="heroMiniStats">{heroStats.map(item => <div key={item.label}><b>{item.value}</b><span>{item.label}</span></div>)}</div>
     </div>
   </section>;
 }
 
-function PremiumCommandStrip() {
-  return <div className="premiumCommandStrip">
-    {PREMIUM_PATH_STEPS.map(step => <Link key={step.title} to={step.to}><b>{step.number}</b><span>{step.title}</span><small>{step.text}</small></Link>)}
+function DailyPlan({ activeDay, today, weak }) {
+  const plan = [
+    { title: 'Salesforce Core', text: today.salesforce, to: '/practice', action: 'Practice' },
+    { title: 'DSA Pattern', text: today.dsa, to: '/practice', action: 'Solve' },
+    { title: 'System Design', text: today.systemDesign, to: '/ai-mentor', action: 'Explain' },
+    { title: 'Project Proof', text: today.projectTask, to: '/projects', action: 'Build' },
+    { title: 'Interview Output', text: today.interviewTask, to: '/interview', action: 'Answer' },
+  ];
+  return <Card title={`Day ${activeDay} Professional Plan`} subtitle="Clear priority for today. Do these before opening extra tools.">
+    <div className="taskGrid">
+      {plan.map((item, index) => <Link className="taskCard" key={item.title} to={item.to}>
+        <span>{String(index + 1).padStart(2, '0')}</span><b>{item.title}</b><small>{item.text}</small><em>{item.action}</em>
+      </Link>)}
+    </div>
+    <p className="hint">{weak > 0 ? `Priority: revise ${weak} weak topic(s) before learning new topics.` : 'Priority: mark one topic Weak or Strong after practice.'}</p>
+  </Card>;
+}
+
+function HomeExecutiveGrid({ score, activeDay, completedTasks, totalTasks, savedAnswers, applied, strong, weak, weeklyResults, routeDoneToday }) {
+  const taskProgress = totalTasks ? completedTasks / totalTasks * 100 : 0;
+  return <div className="statsGrid premiumStatsGrid dashboardCleanStats">
+    <Stat icon="DAY" label="Current Day" value={`Day ${activeDay}`} note="90-day career sprint"/>
+    <Stat icon="SCORE" label="Job Ready" value={`${score}%`} note="Real saved-work score"/>
+    <Stat icon="TASK" label="Tasks Done" value={`${completedTasks}/${totalTasks || 0}`} note={`${Math.round(taskProgress)}% daily execution`}/>
+    <Stat icon="ANS" label="Saved Answers" value={savedAnswers} note="Practice + mentor + interview"/>
+    <Stat icon="STR" label="Strong Topics" value={strong} note="Interview confidence"/>
+    <Stat icon="WEAK" label="Weak Topics" value={weak} note="Revision backlog"/>
+    <Stat icon="TEST" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Proof of assessment"/>
+    <Stat icon="JOB" label="Applied Jobs" value={applied} note={`Route done ${routeDoneToday}/6`}/>
   </div>;
 }
 
-function QuickStartCard() {
-  return <Card title="Quick Start" subtitle="Open the right page fast.">
-    <div className="quickStartStack">
-      {QUICK_START_CARDS.map(card => <Link key={card.title} to={card.to}><span>{card.icon}</span><div><b>{card.title}</b><small>{card.text}</small></div></Link>)}
+function ScoreBreakdown({ score, completedTasks, totalTasks, savedAnswers, strong, applied, weeklyResults }) {
+  return <Card title="Job Ready Score Breakdown" subtitle="Transparent score from real work, not a fake number.">
+    <div className="mission">
+      <p><b>Overall readiness</b><Progress value={score}/></p>
+      <p><b>Daily execution</b><Progress value={totalTasks ? completedTasks / totalTasks * 100 : 0}/></p>
+      <p><b>Answer practice</b><Progress value={Math.min(100, savedAnswers * 4)}/></p>
+      <p><b>Strong topic confidence</b><Progress value={Math.min(100, strong * 5)}/></p>
+      <p><b>Career pipeline</b><Progress value={Math.min(100, applied * 2 + Object.keys(weeklyResults).length * 5)}/></p>
     </div>
   </Card>;
 }
 
-function PremiumHomeGrid({ activeDay, today, score, weak, strong }) {
-  return <div className="premiumHomeGrid">
-    <Card title="Today Task" subtitle="Start with the most useful action."><div className="homeFocusCard"><span>GO</span><b>Day {activeDay}: {today.salesforce}</b><p>Complete one practice set, save one answer, and track one proof item today.</p><Link className="btn cyan" to="/practice">Start Question Bank</Link></div></Card>
-    <Card title="Job Ready Score" subtitle="Based on saved work."><div className="homeScoreBlock"><b>{score}%</b><Progress value={score}/><p>Score increases when you save answers, complete tasks, mark strong topics and track jobs.</p></div></Card>
-    <Card title="Weak Topics" subtitle="Fix these first."><div className="homeMetricLine"><b>{weak}</b><span>Weak marked</span></div><div className="homeMetricLine"><b>{strong}</b><span>Strong marked</span></div><Link className="btn ghost" to="/focus">Open Focus Practice</Link></Card>
-    <QuickStartCard />
-  </div>;
-}
-
-function DashboardStats({ activeDay, today, completedTasks, totalTasks, savedAnswers, applied, strong, weak, weeklyResults, routeDoneToday }) {
-  return <div className="statsGrid premiumStatsGrid dashboardCleanStats">
-    <Stat icon="DAY" label="Today Day" value={`Day ${activeDay}`} note={`SF: ${today.salesforce}`}/>
-    <Stat icon="DONE" label="Completed Work" value={`${completedTasks}/${totalTasks || 0}`} note="24h tracker done"/>
-    <Stat icon="ANS" label="Saved Answers" value={savedAnswers} note="Mentor + Practice + Interview"/>
-    <Stat icon="JOB" label="Applied" value={applied} note="Job pipeline"/>
-    <Stat icon="STR" label="Strong Topics" value={strong} note="Based on markings"/>
-    <Stat icon="WEAK" label="Weak Topics" value={weak} note="Plan revision"/>
-    <Stat icon="TEST" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Saved results"/>
-    <Stat icon="PLAN" label="Route Done" value={`${routeDoneToday}/6`} note={`Day ${activeDay} tasks`}/>
-  </div>;
-}
-
-function DashboardDeepGrid({ today, totalTasks, completedTasks, savedAnswers, strong, applied, weeklyResults }) {
-  return <div className="dashboardDeepGrid">
-    <Card title="Today Focus" subtitle="Do only these things first"><div className="mission"><p><b>Salesforce:</b> {today.salesforce}</p><p><b>DSA:</b> {today.dsa}</p><p><b>System Design:</b> {today.systemDesign}</p><p><b>Project:</b> {today.projectTask}</p><p><b>Interview:</b> {today.interviewTask}</p><Link className="btn cyan" to="/practice">Open Question Bank</Link></div></Card>
-    <Card title="Progress Breakdown" subtitle="Your score increases from real saved work"><p>24h tasks</p><Progress value={totalTasks ? completedTasks / totalTasks * 100 : 0}/><p>Saved answers</p><Progress value={Math.min(100, savedAnswers * 4)}/><p>Strong topics</p><Progress value={Math.min(100, strong * 5)}/><p>Job pipeline</p><Progress value={Math.min(100, applied * 2)}/></Card>
-    <Card title="Career Momentum" subtitle="Keep one visible daily proof."><div className="careerMomentum"><div><b>{applied}</b><span>Applications</span></div><div><b>{savedAnswers}</b><span>Saved Answers</span></div><div><b>{Object.keys(weeklyResults).length}</b><span>Weekly Tests</span></div></div><p className="hint">Best next action: save one interview answer and update one job note.</p></Card>
-  </div>;
+function QuickStartCard() {
+  return <Card title="Quick Launch" subtitle="Open the right module in one click.">
+    <div className="quickStartStack">
+      {QUICK_START_CARDS.map(card => <Link key={card.title} to={card.to}><span>{card.icon}</span><div><b>{card.title}</b><small>{card.text}</small></div></Link>)}
+    </div>
+  </Card>;
 }
 
 function LearningCalendar({ activeDay }) {
@@ -156,51 +167,33 @@ function LearningCalendar({ activeDay }) {
   const [selectedDay, setSelectedDay] = React.useState(activeDay);
   const [note, setNote] = React.useState(notes[activeDay] || '');
   const days = Array.from({ length: 14 }, (_, i) => Math.max(1, activeDay - 3 + i)).filter(day => day <= 90);
-
-  const saveStartDate = () => {
-    writeStore('learningStartDate', startDate);
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  const saveDayNote = () => {
-    const next = readStore('learningCalendarNotes', {});
-    next[selectedDay] = note;
-    writeStore('learningCalendarNotes', next);
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  return <Card title="Learning Calendar" subtitle="Save your Day 1 date and write notes for missed or gap days.">
+  const saveStartDate = () => { writeStore('learningStartDate', startDate); window.dispatchEvent(new Event('storage')); };
+  const saveDayNote = () => { const next = readStore('learningCalendarNotes', {}); next[selectedDay] = note; writeStore('learningCalendarNotes', next); window.dispatchEvent(new Event('storage')); };
+  return <Card title="Learning Calendar" subtitle="Save your start date and recovery notes for gap days.">
     <div className="learningCalendarPro">
-      <div className="calendarStartRow">
-        <label><span>Day 1 Start Date</span><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></label>
-        <button className="btn cyan" onClick={saveStartDate}>Save Start</button>
-      </div>
-      <div className="calendarDayGrid">
-        {days.map(day => <button key={day} className={day === selectedDay ? 'active' : ''} onClick={() => { setSelectedDay(day); setNote(readStore('learningCalendarNotes', {})[day] || ''); }}>
-          <b>Day {day}</b><small>{day === activeDay ? 'Today' : readStore('learningCalendarNotes', {})[day] ? 'Note saved' : 'Plan'}</small>
-        </button>)}
-      </div>
+      <div className="calendarStartRow"><label><span>Day 1 Start Date</span><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></label><button className="btn cyan" onClick={saveStartDate}>Save Start</button></div>
+      <div className="calendarDayGrid">{days.map(day => <button key={day} className={day === selectedDay ? 'active' : ''} onClick={() => { setSelectedDay(day); setNote(readStore('learningCalendarNotes', {})[day] || ''); }}><b>Day {day}</b><small>{day === activeDay ? 'Today' : readStore('learningCalendarNotes', {})[day] ? 'Note saved' : 'Plan'}</small></button>)}</div>
       <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Write gap reason, revision note, or recovery plan..." />
       <button className="btn ghost" onClick={saveDayNote}>Save Day Note</button>
     </div>
   </Card>;
 }
 
-function DailyNotifications({ activeDay, today, weak }) {
-  const notifications = [
-    `Day ${activeDay}: Learn ${today.salesforce}`,
-    `Practice: ${today.dsa}`,
-    `System Design: ${today.systemDesign}`,
-    weak > 0 ? `Revision: Fix ${weak} weak topic(s)` : 'Revision: Mark one topic Weak or Strong',
-    'Proof: Save one answer and track one focused sprint'
+function NextActions({ activeDay, today, weak, savedAnswers, applied }) {
+  const actions = [
+    weak > 0 ? `Revise ${weak} weak topic(s) first.` : `Learn and mark confidence for ${today.salesforce}.`,
+    savedAnswers < 10 ? 'Save one 60-second interview answer.' : 'Improve one saved answer with metrics and project impact.',
+    'Complete one focused 45-minute sprint and track it.',
+    applied < 5 ? 'Apply or follow up with at least 3 companies.' : 'Update follow-up notes for active applications.',
+    `Day ${activeDay} proof: save one visible output before closing the app.`
   ];
-  return <Card title="Today Notifications" subtitle="Day-wise guidance so you know what to study today.">
-    <div className="notificationStack">{notifications.map((item, index) => <div key={item}><b>{String(index + 1).padStart(2, '0')}</b><span>{item}</span></div>)}</div>
+  return <Card title="Next Best Actions" subtitle="Simple priority list for today.">
+    <div className="notificationStack">{actions.map((item, index) => <div key={item}><b>{String(index + 1).padStart(2, '0')}</b><span>{item}</span></div>)}</div>
   </Card>;
 }
 
 function ToolsByPurpose() {
-  return <Card title="Tools Grouped by Purpose" subtitle="Clean final flow. Choose the group based on what you want to do now.">
+  return <Card title="Tools by Purpose" subtitle="Clean professional navigation grouped by your goal.">
     <div className="grid2">{TOOL_GROUPS.map(group => <div className="previewCard" key={group.title}><h3>{group.title}</h3><div className="toolGrid compactToolGrid">{group.items.map(item => <Link key={item.label} className="toolTile" to={item.to}><b>{item.icon} {item.label}</b><span>Open</span></Link>)}</div></div>)}</div>
   </Card>;
 }
@@ -216,12 +209,11 @@ export function Dashboard() {
   const data = useDashboardData();
   return <Layout><Page data-refresh={refreshTick}>
     <DashboardHero {...data} />
-    <PremiumCommandStrip />
+    <HomeExecutiveGrid {...data} />
+    <DailyPlan {...data} />
+    <div className="grid2"><NextActions {...data} /><ScoreBreakdown {...data} /></div>
+    <div className="grid2"><LearningCalendar {...data} /><QuickStartCard /></div>
     <DashboardProfessionalSuite />
-    <div className="grid2"><LearningCalendar {...data} /><DailyNotifications {...data} /></div>
-    <PremiumHomeGrid {...data} />
-    <DashboardStats {...data} />
-    <DashboardDeepGrid {...data} />
     <ToolsByPurpose />
   </Page></Layout>;
 }
