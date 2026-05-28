@@ -33,6 +33,23 @@ async function apiPost(path, payload) {
   return data;
 }
 
+async function loadEmailDebug() {
+  try {
+    const response = await fetch(`${API_BASE}/api/debug/smtp?ts=${Date.now()}`);
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function getOtpStatusMessage(data, debug, fallback) {
+  const smtpSuccess = debug?.last_email_provider === 'smtp' && String(debug?.last_email_attempt || '').includes('success') && !debug?.last_email_error;
+  const resendSuccess = debug?.last_email_provider === 'resend' && String(debug?.last_email_attempt || '').includes('success') && !debug?.last_email_error;
+  if (data?.email_sent === true || smtpSuccess || resendSuccess) return fallback;
+  if (debug?.last_email_error) return `Email failed: ${debug.last_email_error}`;
+  return data?.message || 'OTP generated. Please check your email inbox/spam folder.';
+}
+
 async function syncPhotoToBackend(photo) {
   try {
     await fetch(`${API_BASE}/api/items`, {
@@ -135,7 +152,7 @@ export function Login() {
 
   const requestOtp = async () => {
     setBusy(true);
-    setStatus('');
+    setStatus('Sending OTP...');
     try {
       const data = await apiPost('/api/auth/request-signup-otp', {
         name: form.name,
@@ -143,8 +160,9 @@ export function Login() {
         mobile: form.mobile,
         password: form.password
       });
+      const debug = await loadEmailDebug();
       setOtpSent(true);
-      setStatus(data.email_sent === false ? 'OTP could not be emailed. Please check backend email provider settings.' : (data.message || 'OTP sent to your email.'));
+      setStatus(getOtpStatusMessage(data, debug, 'OTP sent successfully. Please check your email inbox/spam folder.'));
     } catch (err) {
       setStatus(err.message || 'Could not send OTP.');
     } finally {
@@ -167,11 +185,12 @@ export function Login() {
 
   const forgotPassword = async () => {
     setBusy(true);
-    setStatus('');
+    setStatus('Sending reset OTP...');
     try {
       const data = await apiPost('/api/auth/forgot-password', { email: form.email });
+      const debug = await loadEmailDebug();
       setOtpSent(true);
-      setStatus(data.email_sent === false ? 'Reset OTP could not be emailed. Please check backend email provider settings.' : (data.message || 'Password reset OTP sent to your email.'));
+      setStatus(getOtpStatusMessage(data, debug, 'Password reset OTP sent successfully. Please check your email inbox/spam folder.'));
     } catch (err) {
       setStatus(err.message || 'Could not send password reset OTP.');
     } finally {
