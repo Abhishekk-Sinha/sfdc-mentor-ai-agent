@@ -6,7 +6,7 @@ from email.message import EmailMessage
 import hashlib, hmac, json, os, random, smtplib, sqlite3, time, urllib.parse, urllib.request
 from pathlib import Path
 
-app = FastAPI(title="SFDC Mentor Complete Backend", version="2.8.4")
+app = FastAPI(title="SFDC Mentor Complete Backend", version="2.8.5")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,11 +23,16 @@ OTP_TTL_SECONDS = int(os.getenv("OTP_TTL_SECONDS", "600"))
 APP_SECRET = os.getenv("APP_SECRET", "sfdc-mentor-local-secret-change-me")
 LAST_EMAIL_ERROR = ""
 LAST_EMAIL_PROVIDER = "none"
+LAST_EMAIL_ATTEMPT = "not-attempted"
 
 
 def now_ts(): return time.time()
 def normalize_email(email: str) -> str: return (email or "").strip().lower()
 def clean_text(value: str) -> str: return (value or "").strip()
+
+def clean_app_password(value: str) -> str:
+    # Gmail App Password is often copied as 4 groups with spaces. Gmail login needs it without spaces.
+    return (value or "").replace(" ", "").strip()
 
 def hash_password(password: str) -> str:
     salt = os.urandom(16).hex()
@@ -118,7 +123,8 @@ def validate_signup(req: SignupOtpRequest):
 
 def build_otp_email(name: str, otp: str, purpose: str):
     subject = "Your Career OS signup OTP" if purpose == "signup" else "Your Career OS password reset OTP"
-    action = "signup" if purpose == "signup" else "password reset"
+    if purpose == "smtp test": subject = "Career OS SMTP test email"
+    action = "signup" if purpose == "signup" else "password reset" if purpose == "password reset" else "SMTP test"
     text = f"Hi {name or 'there'},\n\nYour Career OS {action} OTP is: {otp}\n\nThis OTP is valid for {OTP_TTL_SECONDS // 60} minutes. Do not share it with anyone.\n\nRegards,\nCareer OS Mentor"
     html = f"<p>Hi {name or 'there'},</p><p>Your Career OS {action} OTP is:</p><h2>{otp}</h2><p>This OTP is valid for {OTP_TTL_SECONDS // 60} minutes. Do not share it with anyone.</p><p>Regards,<br/>Career OS Mentor</p>"
     return subject, text, html
@@ -135,33 +141,73 @@ def send_resend_email(to_email: str, name: str, otp: str, purpose: str) -> bool:
         return 200 <= resp.status < 300
 
 
+def send_message_smtp(host: str, port: int, user: str, password: str, msg: EmailMessage):
+    if port == 465:
+        with smtplib.SMTP_SSL(host, 465, timeout=25) as server:
+            server.login(user, password)
+            server.send_message(msg)
+        return
+    with smtplib.SMTP(host, port, timeout=25) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(user, password)
+        server.send_message(msg)
+
+
 def send_smtp_email(to_email: str, name: str, otp: str, purpose: str) -> bool:
-    smtp_host, smtp_user, smtp_password = os.getenv("SMTP_HOST", "").strip(), os.getenv("SMTP_USER", "").strip(), os.getenv("SMTP_PASSWORD", "").strip()
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    global LAST_EMAIL_ATTEMPT
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip() or "smtp.gmail.com"
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_password = clean_app_password(os.getenv("SMTP_PASSWORD", ""))
+    smtp_port = int(os.getenv("SMTP_PORT", "587") or "587")
     mail_from = os.getenv("MAIL_FROM", smtp_user or "no-reply@sfdcmentor.local").strip()
-    if not smtp_host or not smtp_user or not smtp_password: return False
+    if not smtp_user or not smtp_password:
+        raise RuntimeError("SMTP not configured: SMTP_USER or SMTP_PASSWORD missing")
     subject, text, _ = build_otp_email(name, otp, purpose)
-    msg = EmailMessage(); msg["Subject"] = subject; msg["From"] = mail_from; msg["To"] = to_email; msg.set_content(text)
-    with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
-        server.starttls(); server.login(smtp_user, smtp_password); server.send_message(msg)
-    return True
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = mail_from
+    msg["To"] = to_email
+    msg.set_content(text)
+    attempts = [(smtp_host, smtp_port)]
+    if smtp_host == "smtp.gmail.com" and smtp_port != 465:
+        attempts.append((smtp_host, 465))
+    errors = []
+    for host, port in attempts:
+        LAST_EMAIL_ATTEMPT = f"smtp {host}:{port}"
+        try:
+            send_message_smtp(host, port, smtp_user, smtp_password, msg)
+            LAST_EMAIL_ATTEMPT = f"smtp {host}:{port} success"
+            return True
+        except Exception as exc:
+            errors.append(f"{host}:{port} {type(exc).__name__}: {exc}")
+    raise RuntimeError(" | ".join(errors))
 
 
 def send_otp_email(email: str, name: str, otp: str, purpose: str = "signup") -> bool:
-    global LAST_EMAIL_ERROR, LAST_EMAIL_PROVIDER
+    global LAST_EMAIL_ERROR, LAST_EMAIL_PROVIDER, LAST_EMAIL_ATTEMPT
+    LAST_EMAIL_ERROR = ""
+    LAST_EMAIL_ATTEMPT = f"email requested for {email}"
     try:
         if os.getenv("RESEND_API_KEY", "").strip():
             LAST_EMAIL_PROVIDER = "resend"
+            LAST_EMAIL_ATTEMPT = "resend api"
             if send_resend_email(email, name, otp, purpose):
-                LAST_EMAIL_ERROR = ""; return True
+                LAST_EMAIL_ERROR = ""
+                LAST_EMAIL_ATTEMPT = "resend success"
+                return True
     except Exception as exc:
-        LAST_EMAIL_ERROR = f"Resend {type(exc).__name__}: {exc}"; print(f"[RESEND ERROR] {LAST_EMAIL_ERROR}")
+        LAST_EMAIL_ERROR = f"Resend {type(exc).__name__}: {exc}"
+        print(f"[RESEND ERROR] {LAST_EMAIL_ERROR}")
     try:
         LAST_EMAIL_PROVIDER = "smtp"
         if send_smtp_email(email, name, otp, purpose):
-            LAST_EMAIL_ERROR = ""; return True
+            LAST_EMAIL_ERROR = ""
+            return True
     except Exception as exc:
-        LAST_EMAIL_ERROR = f"SMTP {type(exc).__name__}: {exc}"; print(f"[SMTP ERROR] {LAST_EMAIL_ERROR}")
+        LAST_EMAIL_ERROR = f"SMTP {type(exc).__name__}: {exc}"
+        print(f"[SMTP ERROR] {LAST_EMAIL_ERROR}")
     print(f"[OTP NOT EXPOSED IN API] {purpose.upper()} OTP generated for {email}")
     return False
 
@@ -169,12 +215,19 @@ def send_otp_email(email: str, name: str, otp: str, purpose: str = "signup") -> 
 @app.get("/")
 def root(): return {"status": "running", "app": "SFDC Mentor Complete Backend", "docs": "/docs", "sqlite_db": str(DB_PATH)}
 @app.get("/api/health")
-def health(): return {"ok": True, "service": "mentor-backend", "mode": "sqlite + auth otp + password reset + open-cors + resend/smtp + ollama + search-links", "version": "2.8.4", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
+def health(): return {"ok": True, "service": "mentor-backend", "mode": "sqlite + auth otp + password reset + open-cors + robust-gmail-smtp + resend + ollama + search-links", "version": "2.8.5", "sqlite_db": str(DB_PATH), "ollama_base_url": OLLAMA_BASE_URL, "ollama_model": OLLAMA_MODEL, "ollama_timeout_seconds": OLLAMA_TIMEOUT}
 @app.get("/api/cors-test")
 def cors_test(): return {"ok": True, "message": "CORS is open for local development and GitHub Pages.", "allowed_origins": ["*"]}
 @app.get("/api/debug/smtp")
 def debug_smtp():
-    return {"ok": True, "resend_api_key": bool(os.getenv("RESEND_API_KEY", "").strip()), "smtp_host": bool(os.getenv("SMTP_HOST", "").strip()), "smtp_port": os.getenv("SMTP_PORT", "587"), "smtp_user": bool(os.getenv("SMTP_USER", "").strip()), "smtp_password": bool(os.getenv("SMTP_PASSWORD", "").strip()), "mail_from": os.getenv("MAIL_FROM", ""), "last_email_provider": LAST_EMAIL_PROVIDER, "last_email_error": LAST_EMAIL_ERROR}
+    return {"ok": True, "resend_api_key": bool(os.getenv("RESEND_API_KEY", "").strip()), "smtp_host": bool(os.getenv("SMTP_HOST", "smtp.gmail.com").strip()), "smtp_port": os.getenv("SMTP_PORT", "587"), "smtp_user": bool(os.getenv("SMTP_USER", "").strip()), "smtp_password": bool(clean_app_password(os.getenv("SMTP_PASSWORD", ""))), "smtp_password_length": len(clean_app_password(os.getenv("SMTP_PASSWORD", ""))), "mail_from": os.getenv("MAIL_FROM", ""), "last_email_provider": LAST_EMAIL_PROVIDER, "last_email_attempt": LAST_EMAIL_ATTEMPT, "last_email_error": LAST_EMAIL_ERROR}
+@app.get("/api/debug/send-test-email")
+def debug_send_test_email(to: Optional[str] = None):
+    target = normalize_email(to or os.getenv("SMTP_USER", ""))
+    if not target:
+        raise HTTPException(status_code=400, detail="No target email. Add ?to=email@example.com or set SMTP_USER.")
+    sent = send_otp_email(target, "Abhishek", "000000", "smtp test")
+    return {"ok": sent, "target": target, "provider": LAST_EMAIL_PROVIDER, "attempt": LAST_EMAIL_ATTEMPT, "error": LAST_EMAIL_ERROR}
 
 
 @app.post("/api/auth/request-signup-otp")
