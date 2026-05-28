@@ -113,20 +113,31 @@ function TodayCommandCenter({ data, guideMode, setGuideMode }) {
   const { activeDay, today, completedTasks, totalTasks, proofStatus, proofTotal, score, weak, savedAnswers, applied } = data;
   const target = totalTasks ? `${completedTasks}/${totalTasks} tasks` : 'Start tasks';
   const proFacts = [
-    ['Main Goal', today.salesforce], ['Study Target', '8 Hours'], ['Today Progress', target], ['Proof Status', `${proofStatus} • ${proofTotal} proof`], ['Readiness', `${score}%`], ['Weak Topics', weak], ['Saved Answers', savedAnswers], ['Pipeline', `${applied} jobs`]
+    { label: 'Main Goal', value: today.salesforce, to: '/mentor-route' },
+    { label: 'Study Target', value: '8 Hours', to: '/time-tracker' },
+    { label: 'Today Progress', value: target, to: '/time-tracker' },
+    { label: 'Proof Status', value: `${proofStatus} • ${proofTotal} proof`, to: '/dashboard' },
+    { label: 'Readiness', value: `${score}%`, to: '/dashboard' },
+    { label: 'Weak Topics', value: weak, to: '/focus' },
+    { label: 'Saved Answers', value: savedAnswers, to: '/interview' },
+    { label: 'Pipeline', value: `${applied} jobs`, to: '/job-tracker' }
   ];
   const beginnerFacts = [
-    ['Step 1', 'Open Today Route'], ['Step 2', 'Practice questions'], ['Step 3', 'Save one answer'], ['Step 4', 'Mark proof'], ['Today Topic', today.salesforce]
+    { label: 'Step 1', value: 'Open Today Route', to: '/mentor-route' },
+    { label: 'Step 2', value: 'Practice Questions', to: '/practice' },
+    { label: 'Step 3', value: 'Save One Answer', to: '/interview' },
+    { label: 'Step 4', value: 'Mark Today Proof', to: '/time-tracker' },
+    { label: 'Today Topic', value: today.salesforce, to: '/mentor-route' }
   ];
   const facts = guideMode === 'pro' ? proFacts : beginnerFacts;
-  return <Card title="Today Command Center" subtitle={guideMode === 'pro' ? 'Advanced control room for execution, proof and career readiness.' : 'Simple control room. Follow the steps from left to right.'}>
+  return <Card title="Today Command Center" subtitle={guideMode === 'pro' ? 'Advanced control room for execution, proof and career readiness.' : 'Simple control room. Click any step to open the correct page.'}>
     <div className="homeCommandCenter">
       <div className="commandPrimary">
-        <p className="eyebrow">Day {activeDay} Mission</p><h2>{guideMode === 'pro' ? (today.phase || 'Salesforce Career Sprint') : 'Aaj kya karna hai?'}</h2>
-        <p>{guideMode === 'pro' ? 'Execute today like a professional: output, proof, confidence and pipeline.' : 'Bas ye 4 steps follow karo: route kholo, practice karo, answer save karo, proof mark karo.'}</p>
-        <div className="modeSwitch"><button className={guideMode === 'beginner' ? 'active' : ''} onClick={() => { setGuideMode('beginner'); writeStore('homeGuideMode', 'beginner'); }}>Beginner Mode</button><button className={guideMode === 'pro' ? 'active' : ''} onClick={() => { setGuideMode('pro'); writeStore('homeGuideMode', 'pro'); }}>Pro Mode</button></div>
+        <p className="eyebrow">Day {activeDay} Mission</p><h2>{guideMode === 'pro' ? (today.phase || 'Salesforce Career Sprint') : 'What should I do today?'}</h2>
+        <p>{guideMode === 'pro' ? 'Execute today like a professional: output, proof, confidence and pipeline.' : 'Follow these 4 steps: open your route, practice questions, save one answer, and mark today’s proof.'}</p>
+        <div className="modeSwitch"><button className={guideMode === 'beginner' ? 'active' : ''} onClick={() => setGuideMode('beginner')}>Beginner Mode</button><button className={guideMode === 'pro' ? 'active' : ''} onClick={() => setGuideMode('pro')}>Pro Mode</button></div>
       </div>
-      <div className={`commandFacts ${guideMode === 'pro' ? 'proFacts' : 'beginnerFacts'}`}>{facts.map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</div>
+      <div className={`commandFacts ${guideMode === 'pro' ? 'proFacts' : 'beginnerFacts'}`}>{facts.map(item => <Link key={item.label} to={item.to} className="commandFact"><span>{item.label}</span><b>{item.value}</b><small>Open</small></Link>)}</div>
     </div>
   </Card>;
 }
