@@ -8,6 +8,7 @@ import './ultimate-polish.css';
 import './dashboard-pro.css';
 import './home-guide-pro.css';
 import './time-tracker-pro.css';
+import './learning-calendar-pro.css';
 import './interview-pro.css';
 import './mentor-pro.css';
 
