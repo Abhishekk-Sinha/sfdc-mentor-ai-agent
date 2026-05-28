@@ -4,7 +4,8 @@ import { readStore } from './utils/storage';
 import { Login, PortfolioManager } from './pages/AuthPortfolio';
 import { PremiumPortfolio } from './pages/PremiumPortfolio';
 import { Dashboard } from './pages/Dashboard';
-import { AIMentor, FocusMode, LearningCoach, MentorRoute } from './pages/Mentor';
+import { FocusMode, LearningCoach, MentorRoute } from './pages/Mentor';
+import { AIMentorPro } from './pages/AIMentorPro';
 import { English100 } from './pages/English';
 import { PracticeLab, ScenarioQuestions, UseCases } from './pages/Practice';
 import { ProjectsPage, WeeklyTests } from './pages/TestsInterview';
@@ -26,36 +27,37 @@ function DashboardRedirect() {
 
 export default function App() {
   const home = readStore('session', null) ? '/dashboard' : '/portfolio';
+  const privatePage = component => <Protected>{component}</Protected>;
   return <BrowserRouter><Routes>
     <Route path="/login" element={<Login/>}/>
     <Route path="/portfolio" element={<PremiumPortfolio/>}/>
-    <Route path="/dashboard" element={<Protected><Dashboard/></Protected>}/>
-    <Route path="/ai-mentor" element={<Protected><AIMentor/></Protected>}/>
-    <Route path="/mentor-route" element={<Protected><MentorRoute/></Protected>}/>
-    <Route path="/focus" element={<Protected><FocusMode/></Protected>}/>
-    <Route path="/learning-coach" element={<Protected><LearningCoach/></Protected>}/>
+    <Route path="/dashboard" element={privatePage(<Dashboard/>)}/>
+    <Route path="/ai-mentor" element={privatePage(<AIMentorPro/>)}/>
+    <Route path="/mentor-route" element={privatePage(<MentorRoute/>)}/>
+    <Route path="/focus" element={privatePage(<FocusMode/>)}/>
+    <Route path="/learning-coach" element={privatePage(<LearningCoach/>)}/>
     <Route path="/zero-to-hero" element={<DashboardRedirect/>}/>
-    <Route path="/english" element={<Protected><English100/></Protected>}/>
-    <Route path="/practice" element={<Protected><PracticeLab/></Protected>}/>
-    <Route path="/scenarios" element={<Protected><ScenarioQuestions/></Protected>}/>
-    <Route path="/use-cases" element={<Protected><UseCases/></Protected>}/>
-    <Route path="/weekly-tests" element={<Protected><WeeklyTests/></Protected>}/>
-    <Route path="/interview" element={<Protected><InterviewRoomPro/></Protected>}/>
-    <Route path="/projects" element={<Protected><ProjectsPage/></Protected>}/>
-    <Route path="/job-tracker" element={<Protected><JobTracker/></Protected>}/>
-    <Route path="/jd-matcher" element={<Protected><JDMatcher/></Protected>}/>
-    <Route path="/resume" element={<Protected><ResumeOptimizer/></Protected>}/>
-    <Route path="/time-tracker" element={<Protected><TimeTracker/></Protected>}/>
-    <Route path="/notes" element={<Protected><Notes/></Protected>}/>
-    <Route path="/documents" element={<Protected><Documents/></Protected>}/>
-    <Route path="/doubts" element={<Protected><Doubts/></Protected>}/>
-    <Route path="/journal" element={<Protected><Journal/></Protected>}/>
-    <Route path="/certifications" element={<Protected><Certifications/></Protected>}/>
-    <Route path="/portfolio-manager" element={<Protected><PortfolioManager/></Protected>}/>
+    <Route path="/english" element={privatePage(<English100/>)}/>
+    <Route path="/practice" element={privatePage(<PracticeLab/>)}/>
+    <Route path="/scenarios" element={privatePage(<ScenarioQuestions/>)}/>
+    <Route path="/use-cases" element={privatePage(<UseCases/>)}/>
+    <Route path="/weekly-tests" element={privatePage(<WeeklyTests/>)}/>
+    <Route path="/interview" element={privatePage(<InterviewRoomPro/>)}/>
+    <Route path="/projects" element={privatePage(<ProjectsPage/>)}/>
+    <Route path="/job-tracker" element={privatePage(<JobTracker/>)}/>
+    <Route path="/jd-matcher" element={privatePage(<JDMatcher/>)}/>
+    <Route path="/resume" element={privatePage(<ResumeOptimizer/>)}/>
+    <Route path="/time-tracker" element={privatePage(<TimeTracker/>)}/>
+    <Route path="/notes" element={privatePage(<Notes/>)}/>
+    <Route path="/documents" element={privatePage(<Documents/>)}/>
+    <Route path="/doubts" element={privatePage(<Doubts/>)}/>
+    <Route path="/journal" element={privatePage(<Journal/>)}/>
+    <Route path="/certifications" element={privatePage(<Certifications/>)}/>
+    <Route path="/portfolio-manager" element={privatePage(<PortfolioManager/>)}/>
     <Route path="/premium-features" element={<DashboardRedirect/>}/>
-    <Route path="/final-premium" element={<Protected><FinalPremium/></Protected>}/>
-    <Route path="/more-tools" element={<Protected><MoreTools/></Protected>}/>
-    <Route path="/backup" element={<Protected><Backup/></Protected>}/>
+    <Route path="/final-premium" element={privatePage(<FinalPremium/>)}/>
+    <Route path="/more-tools" element={privatePage(<MoreTools/>)}/>
+    <Route path="/backup" element={privatePage(<Backup/>)}/>
     <Route path="*" element={<Navigate to={home} replace/>}/>
   </Routes></BrowserRouter>;
 }
