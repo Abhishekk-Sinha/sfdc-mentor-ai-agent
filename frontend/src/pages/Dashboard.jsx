@@ -50,15 +50,19 @@ function useDashboardData() {
   const weeklyResults = readStore('weeklyResults', {});
   const mentorDone = readStore('mentorDone', {});
   const savedAnswers = getSavedAnswerCount();
-  const today = roadmap90[(activeDay - 1) % roadmap90.length];
+  const today = roadmap90[(activeDay - 1) % roadmap90.length] || roadmap90[0];
   const strong = Object.values(weakStrong).filter(status => status === 'Strong').length;
   const weak = Object.values(weakStrong).filter(status => status === 'Weak').length;
   const applied = jobs.filter(job => job.applied || job.status === 'Applied').length;
   const completedTasks = tasks.filter(task => task.done).length;
   const totalTasks = tasks.length;
   const routeDoneToday = Object.keys(mentorDone).filter(key => key.startsWith(`${activeDay}-`) && mentorDone[key]).length;
+  const calendarNotes = readStore('learningCalendarNotes', {});
+  const todayProofNote = Boolean(calendarNotes[activeDay] || calendarNotes[Math.min(activeDay, 45)]);
+  const proofTotal = completedTasks + routeDoneToday + (todayProofNote ? 1 : 0);
+  const proofStatus = proofTotal >= 4 ? 'Completed' : proofTotal >= 2 ? 'Partial' : proofTotal >= 1 ? 'Started' : 'Not Saved';
   const score = calculateJobReadyScore({ tasks, savedAnswers, weakStrong, jobs, weeklyResults, mentorDone });
-  return { activeDay, today, score, savedAnswers, strong, weak, applied, completedTasks, totalTasks, routeDoneToday, weeklyResults };
+  return { activeDay, today, score, savedAnswers, strong, weak, applied, completedTasks, totalTasks, routeDoneToday, weeklyResults, calendarNotes, todayProofNote, proofTotal, proofStatus };
 }
 
 function MomentumGraph({ score, savedAnswers, strong, applied, completedTasks = 0, totalTasks = 0, routeDoneToday = 0, weeklyResults = {} }) {
@@ -109,6 +113,28 @@ function DashboardHero(data) {
   </section>;
 }
 
+function TodayCommandCenter({ data, guideMode, setGuideMode }) {
+  const { activeDay, today, completedTasks, totalTasks, proofStatus, proofTotal, score } = data;
+  const target = totalTasks ? `${completedTasks}/${totalTasks} tasks` : 'Start tasks';
+  return <Card title="Today Command Center" subtitle="Your control room for today. Read this first before opening any tool.">
+    <div className="homeCommandCenter">
+      <div className="commandPrimary">
+        <p className="eyebrow">Day {activeDay} Mission</p>
+        <h2>{today.phase || 'Salesforce Career Sprint'}</h2>
+        <p>Finish one clear output today: learn, practice, save proof, and update your progress.</p>
+        <div className="modeSwitch"><button className={guideMode === 'beginner' ? 'active' : ''} onClick={() => { setGuideMode('beginner'); writeStore('homeGuideMode', 'beginner'); }}>Beginner Mode</button><button className={guideMode === 'pro' ? 'active' : ''} onClick={() => { setGuideMode('pro'); writeStore('homeGuideMode', 'pro'); }}>Pro Mode</button></div>
+      </div>
+      <div className="commandFacts">
+        <div><span>Main Goal</span><b>{today.salesforce}</b></div>
+        <div><span>Study Target</span><b>8 Hours</b></div>
+        <div><span>Today Progress</span><b>{target}</b></div>
+        <div><span>Proof Status</span><b>{proofStatus} • {proofTotal} proof</b></div>
+        <div><span>Readiness</span><b>{score}%</b></div>
+      </div>
+    </div>
+  </Card>;
+}
+
 function HomeGuideFlow() {
   const steps = [
     { n: '01', title: 'Learn', text: 'Open Today’s Route and understand one topic clearly.', to: '/mentor-route' },
@@ -122,14 +148,21 @@ function HomeGuideFlow() {
   </Card>;
 }
 
-function BeginnerCompass({ activeDay, today, weak, savedAnswers }) {
-  const items = [
+function BeginnerCompass({ activeDay, today, weak, savedAnswers, guideMode }) {
+  const beginnerItems = [
     { title: 'I do not know what to study', text: `Start Day ${activeDay}: ${today.salesforce}`, to: '/mentor-route', action: 'Open Route' },
     { title: 'I need questions', text: 'Open Question Bank and save at least one answer.', to: '/practice', action: 'Practice' },
     { title: 'I forgot a topic', text: weak > 0 ? `Revise ${weak} weak topic(s) first.` : 'Mark topics Weak/Strong after practice.', to: '/focus', action: 'Focus' },
     { title: 'I need interview confidence', text: savedAnswers < 10 ? 'Write one 60-second answer today.' : 'Improve one saved answer with project impact.', to: '/interview', action: 'Interview' },
   ];
-  return <Card title="Beginner Compass" subtitle="Choose what you need right now. The app will take you to the correct place.">
+  const proItems = [
+    { title: 'Skill Execution', text: `${today.salesforce}. Finish one project-style example.`, to: '/projects', action: 'Build' },
+    { title: 'Interview Output', text: 'Save one STAR/project-impact answer with metrics.', to: '/interview', action: 'Polish' },
+    { title: 'Weak Topic Control', text: weak > 0 ? `${weak} weak topic(s) need revision.` : 'Convert today’s topic into Strong.', to: '/focus', action: 'Improve' },
+    { title: 'Career Pipeline', text: 'Update job tracker and follow-up actions.', to: '/job-tracker', action: 'Track' },
+  ];
+  const items = guideMode === 'pro' ? proItems : beginnerItems;
+  return <Card title={guideMode === 'pro' ? 'Pro Execution Compass' : 'Beginner Compass'} subtitle={guideMode === 'pro' ? 'Professional focus: output, confidence, proof, pipeline.' : 'Choose what you need right now. The app will take you to the correct place.'}>
     <div className="beginnerCompassGrid">{items.map(item => <Link key={item.title} to={item.to} className="compassTile"><h3>{item.title}</h3><p>{item.text}</p><span>{item.action}</span></Link>)}</div>
   </Card>;
 }
@@ -145,6 +178,20 @@ function DailyStudyBlocks() {
   ];
   return <Card title="8-Hour Study Structure" subtitle="A simple daily split for basic to advanced learning.">
     <div className="studyBlockGrid">{blocks.map(([time, title, text]) => <div key={title}><b>{time}</b><span>{title}</span><small>{text}</small></div>)}</div>
+  </Card>;
+}
+
+function EightHourTimeline() {
+  const blocks = [
+    ['09:00 - 11:00', 'Salesforce Deep Work', 'Core topic + notes + one small example', '/mentor-route'],
+    ['11:15 - 12:15', 'DSA Practice', 'One pattern, one problem, one learning note', '/practice'],
+    ['12:30 - 01:30', 'System Design', 'One concept + real project explanation', '/ai-mentor'],
+    ['03:00 - 05:00', 'Project Proof', 'Build/fix/polish one visible project item', '/projects'],
+    ['05:30 - 06:30', 'Interview Output', 'Write and save one 60-second answer', '/interview'],
+    ['07:00 - 08:00', 'Revision + Job', 'Weak topic revision + job tracker update', '/job-tracker'],
+  ];
+  return <Card title="Daily 8-Hour Timeline" subtitle="Follow this schedule when you can give 8 focused hours.">
+    <div className="hourTimeline">{blocks.map(([time, title, text, to], index) => <Link key={title} to={to}><b>{String(index + 1).padStart(2, '0')}</b><span>{time}</span><strong>{title}</strong><small>{text}</small></Link>)}</div>
   </Card>;
 }
 
@@ -178,6 +225,70 @@ function HomeExecutiveGrid({ score, activeDay, completedTasks, totalTasks, saved
     <Stat icon="TEST" label="Weekly Tests" value={Object.keys(weeklyResults).length} note="Proof of assessment"/>
     <Stat icon="JOB" label="Applied Jobs" value={applied} note={`Route done ${routeDoneToday}/6`}/>
   </div>;
+}
+
+function SimpleProgressCards({ data }) {
+  const { score, completedTasks, totalTasks, savedAnswers, weak, activeDay, proofStatus, applied } = data;
+  const taskProgress = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const cards = [
+    ['Today Progress', `${taskProgress}%`, `${completedTasks}/${totalTasks || 0} tasks complete`],
+    ['45-Day Sprint', `Day ${Math.min(activeDay, 45)}`, 'Filtered calendar + proof map'],
+    ['Job Ready Score', `${score}%`, 'From saved work and practice'],
+    ['Saved Answers', savedAnswers, 'Interview proof created'],
+    ['Weak Topics', weak, weak ? 'Revise first today' : 'No urgent weak topic'],
+    ['Proof Status', proofStatus, 'Save note before closing'],
+    ['Job Pipeline', applied, 'Applications/follow-ups tracked'],
+  ];
+  return <Card title="Simple Progress Dashboard" subtitle="Every number has a clear meaning, so you know exactly what to improve.">
+    <div className="simpleProgressCards">{cards.map(([title, value, text]) => <div key={title}><b>{value}</b><span>{title}</span><small>{text}</small></div>)}</div>
+  </Card>;
+}
+
+function WhatShouldIDoNow({ data }) {
+  const { weak, savedAnswers, applied, activeDay, today, proofStatus } = data;
+  let action = `Open Day ${activeDay} route and study: ${today.salesforce}.`;
+  if (weak > 0) action = `Revise ${weak} weak topic(s) first. Do not start random new topics.`;
+  else if (savedAnswers < 10) action = 'Write and save one 60-second interview answer today.';
+  else if (proofStatus !== 'Completed') action = 'Save today proof in Learning Proof Map or Learning Calendar.';
+  else if (applied < 5) action = 'Apply or follow up with 3 companies and update Job Tracker.';
+  return <Card title="What Should I Do Now?" subtitle="One button style answer for your next action.">
+    <div className="whatNowBox"><b>Next Best Move</b><p>{action}</p><div><Link className="btn cyan" to="/mentor-route">Start Now</Link><Link className="btn ghost" to="/time-tracker">Start Timer</Link></div></div>
+  </Card>;
+}
+
+function ProofCalendarStatus({ data }) {
+  const { activeDay, todayProofNote, proofStatus, proofTotal, calendarNotes } = data;
+  const savedNotes = Object.keys(calendarNotes || {}).length;
+  return <Card title="Proof + Calendar Status" subtitle="Home Guide is connected with your Learning Calendar and Proof Map.">
+    <div className="proofStatusGrid"><div><span>Today Proof</span><b>{proofStatus}</b><small>{proofTotal} proof point(s) saved</small></div><div><span>Calendar Note</span><b>{todayProofNote ? 'Saved' : 'Pending'}</b><small>Day {Math.min(activeDay, 45)} daily note</small></div><div><span>45-Day Notes</span><b>{savedNotes}/45</b><small>Learning calendar progress</small></div></div>
+    <div className="proofStatusActions"><Link className="btn cyan" to="/dashboard">Save Today Proof</Link><Link className="btn ghost" to="/time-tracker">Open Time Tracker</Link></div>
+  </Card>;
+}
+
+function PriorityNotifications({ data }) {
+  const { weak, proofStatus, savedAnswers, applied } = data;
+  const urgent = proofStatus !== 'Completed' ? 'Today proof is not completed yet.' : 'No urgent proof issue.';
+  const today = weak > 0 ? `Revise ${weak} weak topic(s).` : savedAnswers < 10 ? 'Save one interview answer.' : 'Complete one project proof.';
+  const optional = applied < 5 ? 'Apply/follow up with 3 companies.' : 'Polish portfolio or resume.';
+  return <Card title="Priority Notifications" subtitle="Grouped reminders: urgent, today, optional.">
+    <div className="priorityNoticeGrid"><div className="urgent"><b>Urgent</b><p>{urgent}</p></div><div className="today"><b>Today</b><p>{today}</p></div><div className="optional"><b>Optional</b><p>{optional}</p></div></div>
+  </Card>;
+}
+
+function WeeklyMission() {
+  const missions = ['5 Salesforce topics', '5 DSA problems', '5 System Design notes', '10 interview answers', '20 job applications/follow-ups'];
+  return <Card title="This Week Mission" subtitle="Weekly output target to move from learning to job-ready.">
+    <div className="weeklyMissionList">{missions.map((mission, index) => <div key={mission}><b>{String(index + 1).padStart(2, '0')}</b><span>{mission}</span></div>)}</div>
+  </Card>;
+}
+
+function CareerOSFlow() {
+  const steps = [
+    ['Learn', '/mentor-route'], ['Practice', '/practice'], ['Build', '/projects'], ['Track', '/time-tracker'], ['Apply', '/job-tracker'], ['Review', '/dashboard']
+  ];
+  return <Card title="Career OS Control Flow" subtitle="Use the app like a professional system, not a random collection of pages.">
+    <div className="careerOSFlow">{steps.map(([label, to], index) => <Link key={label} to={to}><b>{String(index + 1).padStart(2, '0')}</b><span>{label}</span></Link>)}</div>
+  </Card>;
 }
 
 function ScoreBreakdown({ score, completedTasks, totalTasks, savedAnswers, strong, applied, weeklyResults }) {
@@ -280,6 +391,7 @@ function ToolsByPurpose() {
 
 export function Dashboard() {
   const [refreshTick, setRefreshTick] = React.useState(0);
+  const [guideMode, setGuideMode] = React.useState(() => readStore('homeGuideMode', 'beginner'));
   React.useEffect(() => {
     const id = setInterval(() => setRefreshTick(t => t + 1), 5000);
     const onStorage = () => setRefreshTick(t => t + 1);
@@ -289,9 +401,15 @@ export function Dashboard() {
   const data = useDashboardData();
   return <Layout><Page data-refresh={refreshTick}>
     <DashboardHero {...data} />
+    <TodayCommandCenter data={data} guideMode={guideMode} setGuideMode={setGuideMode} />
     <HomeGuideFlow />
+    <CareerOSFlow />
+    <SimpleProgressCards data={data} />
+    <div className="grid2"><WhatShouldIDoNow data={data} /><PriorityNotifications data={data} /></div>
+    <div className="grid2"><ProofCalendarStatus data={data} /><WeeklyMission /></div>
+    <EightHourTimeline />
     <HomeExecutiveGrid {...data} />
-    <div className="grid2"><BeginnerCompass {...data} /><DailyStudyBlocks /></div>
+    <div className="grid2"><BeginnerCompass {...data} guideMode={guideMode} /><DailyStudyBlocks /></div>
     <DailyPlan {...data} />
     <div className="grid2"><NextActions {...data} /><ScoreBreakdown {...data} /></div>
     <div className="grid2"><LearningCalendar {...data} /><QuickStartCard /></div>
