@@ -1,5 +1,6 @@
 import React from 'react';
 import { Layout, Page, Hero, Card } from '../components/UI';
+import './ai-mentor-pro.css';
 
 const API_CANDIDATES = [
   'http://127.0.0.1:8000',
@@ -46,7 +47,7 @@ function cleanAnswer(data) {
 
 function collectLocalContext() {
   const keys = Object.keys(localStorage || {});
-  const important = keys.filter(k => /sfdc|mentor|answer|project|resume|weak|tracker|routine|calendar|proof|interview|job/i.test(k)).slice(0, 80);
+  const important = keys.filter(k => /sfdc|mentor|answer|project|resume|weak|tracker|routine|calendar|proof|interview|job|dsa|system/i.test(k)).slice(0, 100);
   const snapshot = {};
   important.forEach(k => {
     try {
@@ -58,13 +59,47 @@ function collectLocalContext() {
     role: 'Salesforce Developer',
     user: 'Abhishek',
     source: 'AI Mentor Pro v3',
+    supportedDomains: ['Salesforce', 'Apex', 'LWC', 'Flow', 'SOQL', 'DSA', 'System Design', 'Interview', 'Resume', 'Projects', 'AI technology news'],
     localStorageKeys: important,
     localStorageSnapshot: snapshot
   };
 }
 
 function fallbackAnswer(question) {
-  return `AI Mentor Pro answer\n\nI could not connect to the full AI backend right now, but here is the professional structure for your question:\n\n${question}\n\n1. Explain the direct definition.\n2. Connect it with a Salesforce project use case.\n3. Mention implementation approach.\n4. Add security, testing and governor-limit points.\n5. Finish with business impact.\n\nFor best dynamic answers, keep backend + Ollama running locally.`;
+  return `AI Mentor Pro answer\n\nI could not connect to the full AI backend right now, but here is the professional structure for your question:\n\n${question}\n\n1. Explain the direct definition.\n2. Connect it with a project or interview use case.\n3. Mention implementation approach.\n4. Add testing, edge cases and best practices.\n5. Finish with business impact.\n\nFor best dynamic answers, keep backend + Ollama running locally.`;
+}
+
+function renderInline(text, keyPrefix) {
+  const parts = [];
+  const regex = /(https?:\/\/[^\s)]+)|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*/g;
+  let last = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    if (match[1]) {
+      parts.push(<a key={`${keyPrefix}-url-${match.index}`} href={match[1]} target="_blank" rel="noreferrer">{match[1]}</a>);
+    } else if (match[2] && match[3]) {
+      parts.push(<a key={`${keyPrefix}-md-${match.index}`} href={match[3]} target="_blank" rel="noreferrer">{match[2]}</a>);
+    } else if (match[4]) {
+      parts.push(<strong key={`${keyPrefix}-b-${match.index}`}>{match[4]}</strong>);
+    }
+    last = regex.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+function renderMentorAnswer(answer) {
+  const lines = String(answer || '').split('\n');
+  return lines.map((line, i) => {
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={i} className="mentorBlank" />;
+    if (/^#{1,3}\s+/.test(trimmed)) return <h3 key={i}>{renderInline(trimmed.replace(/^#{1,3}\s+/, ''), `h-${i}`)}</h3>;
+    if (/^\*\*.+\*\*$/.test(trimmed)) return <h3 key={i}>{renderInline(trimmed, `strongh-${i}`)}</h3>;
+    if (/^[-*•]\s+/.test(trimmed)) return <div key={i} className="mentorBullet">• <span>{renderInline(trimmed.replace(/^[-*•]\s+/, ''), `b-${i}`)}</span></div>;
+    if (/^\d+[.)]\s+/.test(trimmed)) return <div key={i} className="mentorStep"><b>{trimmed.match(/^\d+/)?.[0]}.</b><span>{renderInline(trimmed.replace(/^\d+[.)]\s+/, ''), `s-${i}`)}</span></div>;
+    return <p key={i}>{renderInline(line, `p-${i}`)}</p>;
+  });
 }
 
 export function AIMentorPro() {
@@ -96,7 +131,7 @@ export function AIMentorPro() {
           question: text,
           mode: 'ollama',
           use_web: true,
-          answer_style: 'professional interview ready',
+          answer_style: 'professional interview ready for Salesforce, DSA and System Design',
           context: { ...collectLocalContext(), originalQuestion: text }
         })
       });
@@ -116,7 +151,7 @@ export function AIMentorPro() {
   }
 
   async function latestNews() {
-    await ask('Tell me latest AI and technology news useful for a Salesforce Developer. Include Agentforce, AI agents, RAG, local LLM, developer tools and career impact.');
+    await ask('Tell me latest AI and technology news useful for a Salesforce Developer. Include Agentforce, AI agents, RAG, local LLM, developer tools and career impact. Do not include physics/science news unless it is directly AI or software technology related.');
   }
 
   return (
@@ -124,10 +159,10 @@ export function AIMentorPro() {
       <Page>
         <Hero
           title="AI Mentor Pro v3"
-          subtitle="Ollama + Personal RAG + Salesforce Knowledge + AI/Technology News + Source Links"
+          subtitle="Ollama + Personal RAG + Salesforce/DSA/System Design + AI/Technology News + Clickable Sources"
         />
 
-        <Card title="Ask Mentor" subtitle="Ask any Salesforce, Apex, LWC, Flow, SOQL, interview, project, resume, weak-topic or AI technology question.">
+        <Card title="Ask Mentor" subtitle="Ask Salesforce, DSA, System Design, interview, project, resume, weak-topic or AI technology questions.">
           <textarea
             className="mentorProTextarea"
             value={question}
@@ -143,7 +178,7 @@ export function AIMentorPro() {
 
         {answer ? (
           <Card title="Professional Mentor Answer" subtitle={asked}>
-            <pre className="mentorProAnswer">{answer}</pre>
+            <div className="mentorAnswerBox">{renderMentorAnswer(answer)}</div>
             {sources.length ? (
               <div className="sourceBox">
                 <b>Sources</b>
