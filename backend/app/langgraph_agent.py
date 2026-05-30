@@ -88,7 +88,6 @@ def detect_intent(question: str, domain: str) -> str:
 
 def should_search_web(question: str, domain: str) -> bool:
     q = (question or "").lower()
-    # Only search when freshness is required or the topic is broad/current.
     if any(t in q for t in ("latest", "news", "update", "recent", "current", "today", "release", "trend")):
         return True
     if domain in ("ai_technology_news", "salesforce_updates"):
@@ -177,12 +176,7 @@ def run_langgraph_mentor(
     fallback: Callable[[str, List[Dict[str, Any]], List[Dict[str, Any]]], str],
     force_web: bool = False,
 ) -> Dict[str, Any]:
-    """LangGraph-powered mentor workflow with safe sequential fallback.
-
-    The graph is intentionally lightweight so it works on free/local machines.
-    It routes the question, retrieves RAG context, searches web/news only when needed,
-    builds an elite prompt, and asks Ollama/LLM for the final answer.
-    """
+    """LangGraph-powered mentor workflow with safe sequential fallback."""
 
     def route_node(state: MentorAgentState) -> MentorAgentState:
         domain = detect_domain(state["question"])
@@ -204,7 +198,7 @@ def run_langgraph_mentor(
             state["news"] = []
         return state
 
-    def prompt_node(state: MentorAgentState) -> MentorAgentState:
+    def build_prompt_node(state: MentorAgentState) -> MentorAgentState:
         state["sources"] = build_sources(state.get("kb") or [], state.get("news") or [])
         state["prompt"] = build_elite_prompt(state)
         return state
@@ -231,17 +225,17 @@ def run_langgraph_mentor(
         graph.add_node("route", route_node)
         graph.add_node("retrieve", retrieve_node)
         graph.add_node("web", web_node)
-        graph.add_node("prompt", prompt_node)
+        graph.add_node("build_prompt", build_prompt_node)
         graph.add_node("generate", generate_node)
         graph.set_entry_point("route")
         graph.add_edge("route", "retrieve")
         graph.add_edge("retrieve", "web")
-        graph.add_edge("web", "prompt")
-        graph.add_edge("prompt", "generate")
+        graph.add_edge("web", "build_prompt")
+        graph.add_edge("build_prompt", "generate")
         graph.add_edge("generate", END)
         final_state = graph.compile().invoke(initial)
     else:
-        final_state = generate_node(prompt_node(web_node(retrieve_node(route_node(initial)))))
+        final_state = generate_node(build_prompt_node(web_node(retrieve_node(route_node(initial)))))
 
     return {
         "ok": True,
