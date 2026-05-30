@@ -158,8 +158,8 @@ export function AIMentorPro() {
     <Layout>
       <Page>
         <Hero
-          title="AI Mentor Pro v3"
-          subtitle="Ollama + Personal RAG + Salesforce/DSA/System Design + AI/Technology News + Clickable Sources"
+          title="AI Mentor"
+          subtitle=""
         />
 
         <Card title="Ask Mentor" subtitle="Ask Salesforce, DSA, System Design, interview, project, resume, weak-topic or AI technology questions.">
