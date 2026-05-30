@@ -21,12 +21,14 @@ export function detectMentorDomain(question = '') {
 }
 
 export function buildMentorFormat(domain, intent) {
-  if (domain === 'DSA') return 'Approach, intuition, dry run, optimized solution, time complexity, space complexity, common mistake.';
-  if (domain === 'System Design') return 'Requirements, APIs, data model, architecture, scaling, caching, queue, tradeoffs, bottlenecks.';
-  if (domain === 'Resume/JD') return 'Match score, matched skills, missing skills, resume bullets, interview talking points.';
-  if (intent === 'Debug / Fix') return 'Root cause, exact fix, validation steps, common mistakes.';
-  if (intent === 'Interview Answer') return 'Definition, project use case, implementation, best practices, business impact, 60-second answer.';
-  return 'Direct answer, simple explanation, real project use case, steps, best practices, next action.';
+  if (domain === 'DSA') return 'Deep DSA answer: problem intuition, brute force, optimized approach, dry run, edge cases, time complexity, space complexity, pseudo code, common mistakes, similar practice question.';
+  if (domain === 'System Design') return 'Deep system design answer: functional requirements, non-functional requirements, APIs, database schema, high-level architecture, scaling plan, caching, queues, failure handling, tradeoffs, bottlenecks, interview summary.';
+  if (domain === 'Resume/JD') return 'Deep resume/JD answer: match score, matched skills, missing skills, ATS keywords, resume bullets, project mapping, interview talking points, next improvement.';
+  if (domain === 'Salesforce') return 'Deep Salesforce answer: direct definition, why it is used, real CRM/project use case, object/data/security impact, step-by-step implementation, governor limits, testing, deployment, common mistakes, interview-ready answer, practice task.';
+  if (domain === 'AI/ML/NLP') return 'Deep AI/ML/NLP answer: concept, use case in this app, data flow, model/prompt/RAG design, limitations, risks, improvement plan, practical implementation steps.';
+  if (intent === 'Debug / Fix') return 'Deep debugging answer: root cause, exact fix, validation steps, logs to check, common mistakes, prevention.';
+  if (intent === 'Interview Answer') return 'Deep interview answer: short definition, project use case, implementation details, best practices, business impact, 60-second answer, follow-up questions.';
+  return 'Deep mentor answer: direct answer, concept explanation, real project example, steps, analysis, tradeoffs, best practices, common mistakes, interview answer, next action.';
 }
 
 export function predictMentorWeakTopics(question = '') {
@@ -55,14 +57,7 @@ export function analyzeMentorQuestion(question = '') {
   const domain = detectMentorDomain(question);
   const intent = detectMentorIntent(question);
   const weakTopics = predictMentorWeakTopics(question);
-  return {
-    domain,
-    intent,
-    format: buildMentorFormat(domain, intent),
-    weakTopics,
-    nextAction: nextMentorAction(domain, intent, weakTopics),
-    confidence: domain === 'Career' ? 'Medium' : 'High'
-  };
+  return { domain, intent, format: buildMentorFormat(domain, intent), weakTopics, nextAction: nextMentorAction(domain, intent, weakTopics), confidence: domain === 'Career' ? 'Medium' : 'High' };
 }
 
 export function scoreMentorAnswer(answer = '', domain = 'Career', intent = 'Professional Explanation') {
@@ -70,11 +65,11 @@ export function scoreMentorAnswer(answer = '', domain = 'Career', intent = 'Prof
   const words = text.split(/\s+/).filter(Boolean).length;
   const cap = n => Math.max(1, Math.min(10, n));
   let clarity = cap(4 + Math.round(words / 55));
-  let depth = 4 + ['implementation', 'best practice', 'security', 'test', 'complexity', 'architecture', 'governor', 'tradeoff'].filter(x => text.includes(x)).length;
+  let depth = 4 + ['implementation', 'best practice', 'security', 'test', 'complexity', 'architecture', 'governor', 'tradeoff', 'edge case', 'limitation'].filter(x => text.includes(x)).length;
   let project = 4 + ['project', 'use case', 'business', 'impact', 'crm', 'doctor', 'patient'].filter(x => text.includes(x)).length;
-  let interview = 4 + ['interview', 'answer', 'example', 'result', 'explain'].filter(x => text.includes(x)).length;
-  if (domain === 'DSA' && /complexity|dry run|optimized|brute/.test(text)) depth += 2;
-  if (domain === 'System Design' && /scale|cache|database|api|queue|tradeoff/.test(text)) depth += 2;
+  let interview = 4 + ['interview', 'answer', 'example', 'result', 'explain', 'follow-up'].filter(x => text.includes(x)).length;
+  if (domain === 'DSA' && /complexity|dry run|optimized|brute|edge/.test(text)) depth += 2;
+  if (domain === 'System Design' && /scale|cache|database|api|queue|tradeoff|bottleneck/.test(text)) depth += 2;
   if (intent === 'Interview Answer') interview += 2;
   depth = cap(depth); project = cap(project); interview = cap(interview);
   return { clarity, depth, projectConnection: project, interviewReadiness: interview, overall: Math.round((clarity + depth + project + interview) / 4) };
